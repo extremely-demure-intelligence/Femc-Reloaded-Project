@@ -1,155 +1,48 @@
-﻿using p3rpc.commonmodutils;
-using p3rpc.nativetypes.Interfaces;
-using Reloaded.Hooks.Definitions;
-using Reloaded.Hooks.Definitions.Enums;
-using Reloaded.Hooks.Definitions.X64;
-using System;
-using System.Collections.Generic;
-using System.Linq;
-using System.Text;
-using System.Threading.Tasks;
+using p3rpc.commonmodutils;
 
 namespace p3rpc.femc.Components
 {
-    public class LocationSelect : ModuleBase<FemcContext>
+    // The old DrawMinimap callback wrote mapBg.Color through a stale object offset. The label accent stays native; the label background is patched below.
+    public class LocationSelect : DirectColorModule
     {
-        // (1.0.0, 1.0.1)
-        private string AUIAccessInfoDraw_DrawMinimap_SIG_0 = "4C 8B DC 55 57 49 8D AB ?? ?? ?? ?? 48 81 EC D8 01 00 00 45 0F 29 A3 ?? ?? ?? ??";
-        // (1.0.4)
-        private string AUIAccessInfoDraw_DrawMinimap_SIG_1 = "4C 8B DC 55 57 49 8D AB ?? ?? ?? ?? 48 81 EC 88 01 00 00 41 0F 29 7B ??";
-        // All versions
-        private string UUILocationSelect_DrawLocationSelectBaseColor_SIG = "0F 57 DB 89 85 ?? ?? ?? ?? 0F 57 D2 48 8D 4D ?? 49 8B D6 E8 ?? ?? ?? ?? BA 01 00 00 00";
-        private string UUILocationSelect_DrawLocationSelectTintColor_SIG = "0F 57 DB 89 85 ?? ?? ?? ?? 0F 57 D2 48 8D 4D ?? 49 8B D6 E8 ?? ?? ?? ?? 0F 28 05 ?? ?? ?? ??";
-        private string UUILocationSelect_DrawLocationSelectMarkerSprite_SIG = "4C 8B 47 ?? 48 8D 8D ?? ?? ?? ?? 0F 57 DB";
-        //private string FShortcutItem_SelectedShortcutColor_SIG = "0F 28 05 ?? ?? ?? ?? 48 8D 4B ?? F3 0F 10 5D ??";
-        private string FShortcutItem_SelectedShortcutColor_SIG = "48 8D 53 ?? 89 7B ?? 48 8D 4B ??";
-        private string AUIAccessInfoDraw_DrawMinimapLabel_SIG = "BA 04 00 00 00 89 44 24 ??";
+        private const string UUILocationSelect_DrawLocationSelectBaseColor_SIG = "0F 57 DB 89 85 AC 00 00 00 0F 57 D2 48 8D 4D 70 49 8B D6 E8 ?? ?? ?? ?? BA 01 00 00 00 49 8B CE E8 ?? ?? ?? ?? ?? ?? ?? ?? ?? ?? ?? ?? ?? ?? E8 ?? ?? ?? ?? 0F 57 DB 89 85 AC 00 00 00 0F 57 D2 48 8D 4D 70 49 8B D6 E8 ?? ?? ?? ?? 0F 28 05 ?? ?? ?? ?? 0F 57 C9 0F 29 85 80 02 00 00 41 0F 28";
+        private const string UUILocationSelect_DrawLocationSelectTintColor_SIG = "0F 57 DB 89 85 AC 00 00 00 0F 57 D2 48 8D 4D 70 49 8B D6 E8 ?? ?? ?? ?? 0F 28 05 ?? ?? ?? ?? 0F 57 C9 0F 29 85 80 02 00 00 41 0F 28 F4 F3 0F 5C 35 ?? ?? ?? ?? 41 0F 28 C3 48 89 B5 90 02 00 00 F3 0F 58 05 ?? ?? ?? ?? 33 D2 66 0F 7F 8D B0 02 00 00 49 8B CE 89 B5 68 02 00 00 F3 0F 11 B5 64";
+        private const string UUILocationSelect_DrawLocationSelectMarkerSprite_SIG = "4C 8B 47 48 48 8D 8D 60 02 00 00 0F 57 DB F3 44 0F 11 54 24 20 49 8B D6 89 85 78 02 00 00 E8 ?? ?? ?? ?? 33 D2 49 8B CE E8 ?? ?? ?? ?? 0F 57 C9 0F 28 05 ?? ?? ?? ?? 0F 57 FF 48 8B 8F 20 03 00 00 0F 29 85 10 01 00 00 41 0F 28 C3 F3 0F 58 05 ?? ?? ?? ?? F3 0F 11 B5 F4 00 00 00 0F 57 F6 48";
+        private const string FShortcutItem_SelectedShortcutColor_SIG = "48 8D 53 08 89 7B 3C 48 8D 4B 48 E8 ?? ?? ?? ?? 0F 28 05 ?? ?? ?? ?? 48 8D 4B 30 F3 0F 10 5D 77 0F 57 F6 F3 0F 10 55 6F 49 8B D6 0F 11 83 90 00 00 00 C7 44 24 38 FF FF FF FF 0F 28 0D ?? ?? ?? ?? 0F 11 8B A0 00 00 00 C6 44 24 30 01 0F 28 05 ?? ?? ?? ?? 0F 11 83 B0 00 00 00 F3 0F 10 45 7F";
+        private const string AUIAccessInfoDraw_DrawMinimapLabel_SIG = "BA 04 00 00 00 89 44 24 64 48 8B CF E8 ?? ?? ?? ?? F3 0F 10 05 ?? ?? ?? ?? 48 8D 4D C0 0F 28 0D ?? ?? ?? ?? 0F 57 DB F3 0F 11 45 CC 0F 57 D2 0F 28 05 ?? ?? ?? ?? 48 8B D7 0F 29 45 E0 F3 0F 10 05 ?? ?? ?? ?? 0F 29 4D D0 F3 0F 10 0D ?? ?? ?? ?? F3 0F 11 45 F4 F3 0F 11 4D F0 C7 45 04 00 00";
 
-        private IAsmHook _drawLocationSelBase;
-        private IAsmHook _drawLocationSelTint;
-        private IAsmHook _selMarkerSprite;
-        private IAsmHook _selShortcutColor;
-        private IAsmHook _drawMinimapLabel;
-
-        private IReverseWrapper<UUILocationSelect_SetElementColor> _drawLocationSelBaseWrapper;
-        private IReverseWrapper<UUILocationSelect_SetElementColor> _drawLocationSelTintWrapper;
-        private IReverseWrapper<UUILocationSelect_SetElementColor> _drawLocationSelectMarkerWrapper;
-        //private IReverseWrapper<UUILocationSelect_SetElementColor> _drawLocationSelTintWrapper;
-        private IReverseWrapper<AUIAccessInfoDraw_DrawMinimapLabel> _drawMinimapLabelWrapper;
-
-        //private IHook<UUILocationSelect_DrawLocationSelect> _drawLocationSelect;
-        private IHook<AUIAccessInfoDraw_DrawMinimap> _drawMinimap;
-
-        private UICommon _uiCommon;
-
-        private MultiSignature _drawMinimapMS;
-
-        public unsafe LocationSelect(FemcContext context, Dictionary<string, ModuleBase<FemcContext>> modules) : base(context, modules)
+        public LocationSelect(FemcContext context, Dictionary<string, ModuleBase<FemcContext>> modules) : base(context, modules)
         {
-            _drawMinimapMS = new MultiSignature();
-            _context._utils.MultiSigScan(
-                [AUIAccessInfoDraw_DrawMinimap_SIG_0, AUIAccessInfoDraw_DrawMinimap_SIG_1],
-                "AUIAccessInfoDraw::DrawMinimap", _context._utils.GetDirectAddress,
-                addr => _drawMinimap = _context._utils.MakeHooker<AUIAccessInfoDraw_DrawMinimap>(AUIAccessInfoDraw_DrawMinimapImpl, addr),
-                _drawMinimapMS
-            );
-            _context._utils.SigScan(UUILocationSelect_DrawLocationSelectBaseColor_SIG, "UUILocationSelect::DrawLocationSelectBaseColor", _context._utils.GetDirectAddress, addr =>
-            {
-                string[] function =
-                {
-                    "use64",
-                    $"{_context._utils.PreserveMicrosoftRegisters()}",
-                    $"{_context._hooks.Utilities.GetAbsoluteCallMnemonics(UUILocationSelect_DrawLocationSelectBaseColor, out _drawLocationSelBaseWrapper)}",
-                    $"{_context._utils.RetrieveMicrosoftRegisters()}",
-                };
-                _drawLocationSelBase = _context._hooks.CreateAsmHook(function, addr, AsmHookBehaviour.ExecuteFirst).Activate();
-            });
-            _context._utils.SigScan(UUILocationSelect_DrawLocationSelectTintColor_SIG, "UUILocationSelect::DrawLocationSelectTintColor", _context._utils.GetDirectAddress, addr =>
-            {
-                string[] function =
-                {
-                    "use64",
-                    $"{_context._utils.PreserveMicrosoftRegisters()}",
-                    $"{_context._hooks.Utilities.GetAbsoluteCallMnemonics(UUILocationSelect_DrawLocationSelectTintColor, out _drawLocationSelTintWrapper)}",
-                    $"{_context._utils.RetrieveMicrosoftRegisters()}",
-                };
-                _drawLocationSelTint = _context._hooks.CreateAsmHook(function, addr, AsmHookBehaviour.ExecuteFirst).Activate();
-            });
-            _context._utils.SigScan(UUILocationSelect_DrawLocationSelectMarkerSprite_SIG, "UUILocationSelect::DrawLocationSelectTintColor", _context._utils.GetDirectAddress, addr =>
-            {
-                string[] function =
-                {
-                    "use64",
-                    $"{_context._utils.PreserveMicrosoftRegisters()}",
-                    $"{_context._hooks.Utilities.GetAbsoluteCallMnemonics(UUILocationSelect_DrawLocationSelectMarkerColor, out _drawLocationSelectMarkerWrapper)}",
-                    $"{_context._utils.RetrieveMicrosoftRegisters()}",
-                };
-                _selMarkerSprite = _context._hooks.CreateAsmHook(function, addr, AsmHookBehaviour.ExecuteFirst).Activate();
-            });
-            _context._utils.SigScan(FShortcutItem_SelectedShortcutColor_SIG, "FShortcutItem::SelectedShortcutColor", _context._utils.GetDirectAddress, addr =>
-            {
-                /* old signature
-                string[] function =
-                {
-                    "use64",
-                    $"cmp byte [rbp + 0x67], 0x0",
-                    $"jz whiteColor",
-                    $"mov dword [rbx + 0x3c], {_context._config.LocationSelectSelColor.ToU32()}", // for text
-                    $"mov edi, {_context._config.LocationSelectSelColor.ToU32()}", // for marker
-                    $"label whiteColor"
-                };
-                */
-                string[] function = [
-                    "use64",
-                    "cmp byte [rbp + 0x67], 0x0",
-                    "jz whiteColor",
-                    $"mov edi, {_context._config.LocationSelectSelColor.ToU32()}", // for marker
-                    "label whiteColor"
-                ];
-                _selShortcutColor = _context._hooks.CreateAsmHook(function, addr, AsmHookBehaviour.ExecuteFirst).Activate();
-            });
-            _context._utils.SigScan(AUIAccessInfoDraw_DrawMinimapLabel_SIG, "UUILocationSelect::DrawLocationSelectTintColor", _context._utils.GetDirectAddress, addr =>
-            {
-                string[] function =
-                {
-                    "use64",
-                    $"{_context._utils.PreserveMicrosoftRegisters()}",
-                    $"{_context._hooks.Utilities.GetAbsoluteCallMnemonics(AUIAccessInfoDraw_DrawMinimapLabelImpl, out _drawMinimapLabelWrapper)}",
-                    $"{_context._utils.RetrieveMicrosoftRegisters()}",
-                };
-                _drawMinimapLabel = _context._hooks.CreateAsmHook(function, addr, AsmHookBehaviour.ExecuteFirst).Activate();
-            });
+            _context._utils.SigScan(UUILocationSelect_DrawLocationSelectBaseColor_SIG, "UUILocationSelect_DrawLocationSelectBaseColor_SIG", _context._utils.GetDirectAddress, addr =>
+                PatchColorInputs(addr, "UUILocationSelect_DrawLocationSelectBaseColor_SIG", () => new ConfigColor(255, 255, 255, 0x66),
+                    (-7, "B10A", 0),
+                    (-9, "B229", 1),
+                    (-12, "41B079", 2),
+                    (-15, "41B166", 3)));
+            _context._utils.SigScan(UUILocationSelect_DrawLocationSelectTintColor_SIG, "UUILocationSelect_DrawLocationSelectTintColor_SIG", _context._utils.GetDirectAddress, addr =>
+                PatchColorInputs(addr, "UUILocationSelect_DrawLocationSelectTintColor_SIG", () => _context._config.LocationSelectBgColor,
+                    (-7, "B107", 0),
+                    (-9, "B239", 1),
+                    (-12, "41B0D0", 2),
+                    (-15, "41B1FF", 3)));
+            _context._utils.SigScan(UUILocationSelect_DrawLocationSelectMarkerSprite_SIG, "UUILocationSelect_DrawLocationSelectMarkerSprite_SIG", _context._utils.GetDirectAddress, addr =>
+                PatchColorInputs(addr, "UUILocationSelect_DrawLocationSelectMarkerSprite_SIG", () => _context._config.LocationSelectMarkerColor,
+                    (-7, "B118", 0),
+                    (-13, "33D2", 1),
+                    (-11, "450FB6C1", 2),
+                    (-16, "41B1FF", 3)));
+            _context._utils.SigScan(FShortcutItem_SelectedShortcutColor_SIG, "FShortcutItem_SelectedShortcutColor_SIG", _context._utils.GetDirectAddress, addr =>
+                PatchColorInputs(addr, "FShortcutItem_SelectedShortcutColor_SIG", () => _context._config.LocationSelectSelColor,
+                    (-9, "B118", 0),
+                    (-15, "33D2", 1),
+                    (-13, "450FB6C1", 2)));
+            _context._utils.SigScan(AUIAccessInfoDraw_DrawMinimapLabel_SIG, "AUIAccessInfoDraw_DrawMinimapLabel_SIG", _context._utils.GetDirectAddress, addr =>
+                PatchColorInputs(addr, "AUIAccessInfoDraw_DrawMinimapLabel_SIG", () => _context._config.LocationSelMapBg,
+                    (-12, "B12E", 0),
+                    (-14, "B231", 1),
+                    (-17, "41B050", 2)));
         }
 
-        public override void Register()
-        {
-            _uiCommon = GetModule<UICommon>();
-        }
-        /*
-        private unsafe void UUILocationSelect_DrawLocationSelectImpl(UUILocationSelect* self)
-        {
-            _drawLocationSelect.OriginalFunction(self);
-        }
-        */
-        private unsafe void AUIAccessInfoDraw_DrawMinimapImpl(AUIAccessInfoDraw* self)
-        {
-            self->mapBg.Color = ConfigColor.ToFSprColorWithAlpha(_context._config.LocationSelMapLabel, self->mapBg.Color.A);
-            _drawMinimap.OriginalFunction(self);
-        }
-        private unsafe FSprColor UUILocationSelect_DrawLocationSelectBaseColor(UUILocationSelect* self) => ConfigColor.ToFSprColorWithAlpha(_context.ColorWhite, 0x66);
-        private unsafe FSprColor AUIAccessInfoDraw_DrawMinimapLabelImpl(FSprColor source) => ConfigColor.ToFSprColorWithAlpha(_context._config.LocationSelMapBg, source.A);
-
-        private unsafe FSprColor UUILocationSelect_DrawLocationSelectTintColor(UUILocationSelect* self) => ConfigColor.ToFSprColor(_context._config.LocationSelectBgColor);
-        private unsafe FSprColor UUILocationSelect_DrawLocationSelectMarkerColor(UUILocationSelect* self) => ConfigColor.ToFSprColor(_context._config.LocationSelectMarkerColor);
-        //private unsafe FSprColor FShortcutItem_SelectedShortcutColor(UUILocationSelect* self) => ConfigColor.ToFSprColor(_context._config.LocationSelectSelColor);
-
-        private unsafe delegate void AUIAccessInfoDraw_DrawMinimap(AUIAccessInfoDraw* self);
-        //private unsafe delegate void UUILocationSelect_DrawLocationSelect(UUILocationSelect* self);
-
-        [Function(FunctionAttribute.Register.rax, FunctionAttribute.Register.rax, false)]
-        private unsafe delegate FSprColor AUIAccessInfoDraw_DrawMinimapLabel(FSprColor source);
-
-        [Function(FunctionAttribute.Register.rax, FunctionAttribute.Register.rdi, false)]
-        private unsafe delegate FSprColor UUILocationSelect_SetElementColor(UUILocationSelect* self);
+        public override void Register() { }
     }
 }

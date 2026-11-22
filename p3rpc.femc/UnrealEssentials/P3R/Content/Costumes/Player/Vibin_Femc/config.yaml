@@ -1,8 +1,12 @@
 name: Vibin Femc
 
 hair:
+  anim_path: None
   mesh_path: dieatlus
 
 face:
+  anim_path: None
   mesh_path: dieatlus
 
+costume:
+  anim_path: None

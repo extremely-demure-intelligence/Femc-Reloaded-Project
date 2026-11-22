@@ -244,11 +244,8 @@ namespace p3rpc.femc.Components
         private string UCmpSkillDraw_DrawPartyMemberHealSkillDesc_SIG = "81 CF 00 FF FF 00 44 8B CF"; // UCmpSkillDraw::DrawUseSkillOptions
         private string UCmpSkillDraw_DrawPartyMemberSkillHighlightedColor_SIG = "C6 45 ?? EE 0F 10 80 ?? ?? ?? ??";
 
-        private IAsmHook _drawNoUsableSkillNoneGraphic;
         private IAsmHook _drawNoUsableSkillDescription;
         private IAsmHook _drawPartyMemberSkillHighlightedColor;
-
-        private IReverseWrapper<UCmpSkillDraw_DrawNoUsableSkillNoneGraphic> _drawNoUsableSkillNoneGraphicWrapper;
 
         private UICommon _uiCommon;
         private CampCommon _campCommon;
@@ -256,12 +253,8 @@ namespace p3rpc.femc.Components
         {
             _context._utils.SigScan(UCmpSkillDraw_DrawNoUsableSkillNoneGraphic_SIG, "UCmpSkillDraw::DrawNoUsableSkillNoneGraphic", _context._utils.GetDirectAddress, addr =>
             {
-                string[] function =
-                {
-                    "use64",
-                    $"{_context._hooks.Utilities.GetAbsoluteCallMnemonics(UCmpSkillDraw_DrawNoUsableSkillNoneGraphicImpl, out _drawNoUsableSkillNoneGraphicWrapper)}",
-                };
-                _drawNoUsableSkillNoneGraphic = _context._hooks.CreateAsmHook(function, addr, AsmHookBehaviour.ExecuteAfter).Activate();
+                _asmMemWrites.Add(new AddressToMemoryWrite(_context._memory, (nuint)addr + 2,
+                    address => _context._memory.Write(address, _context._config.CampSkillTextColor.ToU32())));
             });
             /*
             _context._utils.SigScan(UCmpSkillDraw_DrawNoUsableSkillDescription_SIG, "UCmpSkillDraw::DrawNoUsableSkillDescription", _context._utils.GetDirectAddress, addr =>
@@ -304,10 +297,7 @@ namespace p3rpc.femc.Components
             _uiCommon = GetModule<UICommon>();
             _campCommon = GetModule<CampCommon>();
         }
-        private FSprColor UCmpSkillDraw_DrawNoUsableSkillNoneGraphicImpl() => ConfigColor.ToFSprColor(_context._config.CampSkillTextColor);
 
-        [Function(new Register[] { }, FunctionAttribute.Register.r9, false)]
-        private delegate FSprColor UCmpSkillDraw_DrawNoUsableSkillNoneGraphic();
     }
 
     public class CampItem : ModuleAsmInlineColorEdit<FemcContext>
@@ -675,7 +665,7 @@ namespace p3rpc.femc.Components
         private unsafe delegate void UCmpEquipDraw_DrawEquipItemStatsNum(UCmpEquipDraw* self, int queueId, uint num, char a4, float X, float Y, int menuType, FSprColor baseColor, char a9, char a10);
     }
 
-    public class CampPersona : ModuleAsmInlineColorEdit<FemcContext>
+    public class CampPersona : NativeColorModule
     {
 
         private UICommon _uiCommon;
@@ -713,16 +703,6 @@ namespace p3rpc.femc.Components
         private IAsmHook _blankSlotTrans;
         private IAsmHook _unselArcanaTextColorTrans;
 
-        private IReverseWrapper<UCmpPersona_InjectColorR9> _nameColorWrapper;
-        private IReverseWrapper<UCmpPersona_InjectColorR9> _selArcanaBgColorWrapper;
-        private IReverseWrapper<UCmpPersona_InjectColorRAX> _selArcanaTextColorWrapper;
-        private IReverseWrapper<UCmpPersona_InjectColorR9> _unselArcanaBgColorWrapper;
-        private IReverseWrapper<UCmpPersona_InjectColorRAX> _unselArcanaTextColorWrapper;
-
-        private IReverseWrapper<UCmpPersona_InjectColorR9> _nameColorTransWrapper;
-        private IReverseWrapper<UCmpPersona_InjectColorR9> _blankSlotTransWrapper;
-        private IReverseWrapper<UCmpPersona_InjectColorR9PreserveRAX> _unselArcanaTextColorTransWrapper;
-
         public unsafe CampPersona(FemcContext context, Dictionary<string, ModuleBase<FemcContext>> modules) : base(context, modules)
         {
             _context._utils.SigScan(UCmpPersona_DrawCatchphraseColor_SIG, "UCmpPersona::DrawCatchphraseColor", _context._utils.GetDirectAddress, addr =>
@@ -739,51 +719,27 @@ namespace p3rpc.femc.Components
             });
             _context._utils.SigScan(UCmpPersona_PersonaNameColor_SIG, "UCmpPersona::PersonaNameColor", _context._utils.GetDirectAddress, addr =>
             {
-                string[] function =
-                {
-                    "use64",
-                    $"{_context._hooks.Utilities.GetAbsoluteCallMnemonics(UCmpPersona_PersonaNameColorImpl, out _nameColorWrapper)}",
-                };
+                var function = ColorInRegister(() => _context._config.CampPersonaNameColor, "r9d", bgra: true, onlyIfLowByteNonZero: true);
                 _nameColor = _context._hooks.CreateAsmHook(function, addr, AsmHookBehaviour.ExecuteFirst).Activate();
             });
             _context._utils.SigScan(UCmpPersona_SelArcanaBgColor_SIG, "UCmpPersona::SelArcanaBgColor", _context._utils.GetDirectAddress, addr =>
             {
-                string[] function =
-                {
-                    "use64",
-                    $"{_context._hooks.Utilities.GetAbsoluteCallMnemonics(UCmpPersona_SelArcanaBgColorImpl, out _selArcanaBgColorWrapper)}",
-                };
+                var function = ColorInRegister(() => _context._config.CampPersonaNameColor, "r9d", bgra: true);
                 _selArcanaBgColor = _context._hooks.CreateAsmHook(function, addr, AsmHookBehaviour.ExecuteFirst).Activate();
             });
             _context._utils.SigScan(UCmpPersona_SelArcanaTextColor_SIG, "UCmpPersona::SelArcanaTextColor", _context._utils.GetDirectAddress, addr =>
             {
-                string[] function =
-                {
-                    "use64",
-                    $"{_context._utils.PreserveMicrosoftRegisters()}",
-                    $"{_context._hooks.Utilities.GetAbsoluteCallMnemonics(UCmpPersona_SelArcanaTextColorImpl, out _selArcanaTextColorWrapper)}",
-                    $"{_context._utils.RetrieveMicrosoftRegisters()}",
-                };
+                var function = ColorInRegister(() => _context._config.CampPersonaArcanaBgColor, bgra: true);
                 _selArcanaTextColor = _context._hooks.CreateAsmHook(function, addr, AsmHookBehaviour.ExecuteFirst).Activate();
             });
             _context._utils.SigScan(UCmpPersona_UnselArcanaBgColor_SIG, "UCmpPersona::UnselArcanaBgColor", _context._utils.GetDirectAddress, addr =>
             {
-                string[] function =
-                {
-                    "use64",
-                    $"{_context._hooks.Utilities.GetAbsoluteCallMnemonics(UCmpPersona_SelArcanaTextColorImpl, out _unselArcanaBgColorWrapper)}",
-                };
+                var function = ColorInRegister(() => _context._config.CampPersonaArcanaBgColor, "r9d", bgra: true);
                 _unselArcanaBgColor = _context._hooks.CreateAsmHook(function, addr, AsmHookBehaviour.ExecuteFirst).Activate();
             });
             _context._utils.SigScan(UCmpPersona_UnselArcanaTextColor_SIG, "UCmpPersona::UnselArcanaTextColor", _context._utils.GetDirectAddress, addr =>
             {
-                string[] function =
-                {
-                    "use64",
-                    $"{_context._utils.PreserveMicrosoftRegisters()}",
-                    $"{_context._hooks.Utilities.GetAbsoluteCallMnemonics(UCmpPersona_SelArcanaBgColorImpl, out _unselArcanaTextColorWrapper)}",
-                    $"{_context._utils.RetrieveMicrosoftRegisters()}",
-                };
+                var function = ColorInRegister(() => _context._config.CampPersonaNameColor, bgra: true);
                 _unselArcanaTextColor = _context._hooks.CreateAsmHook(function, addr, AsmHookBehaviour.ExecuteFirst).Activate();
             });
             _context._utils.SigScan(UCmpPersona_BlankSlotColor_SIG, "UCmpPersona::BlankSlotColor", _context._utils.GetDirectAddress, addr =>
@@ -794,11 +750,7 @@ namespace p3rpc.femc.Components
             // Transition colors
             _context._utils.SigScan(UCmpPersona_PersonaNameColorTrans_SIG, "UCmpPersona::PersonaNameColorTrans", _context._utils.GetDirectAddress, addr =>
             {
-                string[] function =
-                {
-                    "use64",
-                    $"{_context._hooks.Utilities.GetAbsoluteCallMnemonics(UCmpPersona_PersonaNameColorImpl, out _nameColorTransWrapper)}",
-                };
+                var function = ColorInRegister(() => _context._config.CampPersonaNameColor, "r9d", bgra: true, onlyIfLowByteNonZero: true);
                 _nameColorTrans = _context._hooks.CreateAsmHook(function, addr, AsmHookBehaviour.ExecuteFirst).Activate();
             });
             _context._utils.SigScan(UCmpPersona_UnselArcanaBgColorTrans_SIG, "UCmpPersona::UnselArcanaBgColorTrans", _context._utils.GetDirectAddress, addr =>
@@ -811,22 +763,14 @@ namespace p3rpc.femc.Components
                 "UCmpPersona::BlankSlotColorTrans", _context._utils.GetDirectAddress,
                 addr =>
                 {
-                    string[] function =
-                    {
-                        "use64",
-                        $"{_context._hooks.Utilities.GetAbsoluteCallMnemonics(UCmpPersona_BlankSlotTransImpl, out _blankSlotTransWrapper)}",
-                    };
+                    var function = ColorInRegister(() => _context._config.CampPersonaNameColor, "r9d", preserveAlpha: false);
                     _blankSlotTrans = _context._hooks.CreateAsmHook(function, addr, AsmHookBehaviour.ExecuteFirst).Activate();
                 },
                 _blankSlotColorTransMS
             );
             _context._utils.SigScan(UCmpPersona_UnselArcanaBgTextTrans_SIG, "UCmpPersona::UnselArcanaBgTextTrans", _context._utils.GetDirectAddress, addr =>
             {
-                string[] function =
-                {
-                    "use64",
-                    $"{_context._hooks.Utilities.GetAbsoluteCallMnemonics(UCmpPersona_BlankSlotTransImpl, out _unselArcanaTextColorTransWrapper)}",
-                };
+                var function = ColorInRegister(() => _context._config.CampPersonaNameColor, "r9d", preserveAlpha: false);
                 _unselArcanaTextColorTrans = _context._hooks.CreateAsmHook(function, addr, AsmHookBehaviour.ExecuteFirst).Activate();
             });
             _context._utils.SigScan(UCmpPersona_SelArcanaBgTextTrans_SIG, "UCmpPersona::SelArcanaBgTextTrans", _context._utils.GetDirectAddress, addr =>
@@ -852,24 +796,10 @@ namespace p3rpc.femc.Components
             _uiCommon = GetModule<UICommon>();
             _campCommon = GetModule<CampCommon>();
         }
-        private unsafe FColor UCmpPersona_BlankSlotTransImpl(FColor source) => ConfigColor.ToFColor(_context._config.CampPersonaNameColor);
-        private unsafe FColor UCmpPersona_SelArcanaTextColorImpl(FColor source) => ConfigColor.ToFColorBPWithAlpha(_context._config.CampPersonaArcanaBgColor, source.A);
-        private unsafe FColor UCmpPersona_SelArcanaBgColorImpl(FColor source) => ConfigColor.ToFColorBPWithAlpha(_context._config.CampPersonaNameColor, source.A);
-        private unsafe FColor UCmpPersona_PersonaNameColorImpl(FColor source)
-        {
-            if (source.B != 0) return ConfigColor.ToFColorBPWithAlpha(_context._config.CampPersonaNameColor, source.A);
-            return source;
-        }
 
         public unsafe int GetCatchphraseColorOffset(int comp) => _context.bIsAigis ? 0x60 + comp * sizeof(float) : 0x40 + comp * sizeof(float);
 
-        [Function(FunctionAttribute.Register.r9, FunctionAttribute.Register.r9, false)]
-        public unsafe delegate FColor UCmpPersona_InjectColorR9(FColor source);
         // normal r9 delegates crashes bc rax is replaced, which is used as a pointer deref later
-        [Function(FunctionAttribute.Register.r9, FunctionAttribute.Register.r9, false, new Register[] { FunctionAttribute.Register.rax })] 
-        public unsafe delegate FColor UCmpPersona_InjectColorR9PreserveRAX(FColor source);
-        [Function(FunctionAttribute.Register.rax, FunctionAttribute.Register.rax, false)]
-        public unsafe delegate FColor UCmpPersona_InjectColorRAX(FColor source);
     }
 
     public class CampStats : ModuleAsmInlineColorEdit<FemcContext>
@@ -1559,8 +1489,6 @@ namespace p3rpc.femc.Components
             _uiCommon = GetModule<UICommon>();
             _campCommon = GetModule<CampCommon>();
         }
-        private unsafe FSprColor UCmpCommuList_GetSocialLinkLightColorImpl() => ConfigColor.ToFSprColor(_context._config.CampSocialLinkLight);
-        private unsafe FSprColor UCmpCommuList_GetSocialLinkDarkColorImpl() => ConfigColor.ToFSprColor(_context._config.CampSocialLinkDark);
 
         private unsafe FSprColor UCmpCommuDetails_GetMultiCharacterListTextColorImpl() => ConfigColor.ToFSprColor(_context._config.CampSocialLinkDetailDescName);
 
@@ -1599,11 +1527,11 @@ namespace p3rpc.femc.Components
         private string UUICmpCalendarDraw_DrawCalendarGrid_SundayHeader_SIG = "F3 0F 2C FE 66 C7 85 ?? ?? ?? ?? FF FF";
         private string UUICmpCalendarDraw_DrawCalendarGrid_SundayDay_SIG = "44 88 BD ?? ?? ?? ?? 89 5D ??";
         // Inside UUICmpCalendarDraw::DrawMonthDisplay
-        private string UUICmpCalendarDraw_DrawMonthDisplay_PrevMonthColor_SIG = "40 88 BD ?? ?? ?? ?? 48 89 44 24 ?? E8 ?? ?? ?? ?? 41 8B 86 ?? ?? ?? ??";
-        private string UUICmpCalendarDraw_DrawMonthDisplay_CurrMonthColor_SIG = "40 88 BD ?? ?? ?? ?? 48 89 44 24 ?? E8 ?? ?? ?? ?? 40 84 F6";
-        private string UUICmpCalendarDraw_DrawMonthDisplay_NextMonthColor_SIG = "40 88 BD ?? ?? ?? ?? 48 89 44 24 ?? E8 ?? ?? ?? ?? 41 0F B6 86 ?? ?? ?? ??";
+        private string UUICmpCalendarDraw_DrawMonthDisplay_PrevMonthColor_SIG = "66 C7 85 E8 00 00 00 43 04 C6 85 EA 00 00 00 08 40 88 BD ?? ?? ?? ?? 48 89 44 24 ?? E8 ?? ?? ?? ?? 41 8B 86 ?? ?? ?? ??";
+        private string UUICmpCalendarDraw_DrawMonthDisplay_CurrMonthColor_SIG = "66 C7 85 E8 00 00 00 43 04 C6 85 EA 00 00 00 08 40 88 BD ?? ?? ?? ?? 48 89 44 24 ?? E8 ?? ?? ?? ?? 40 84 F6";
+        private string UUICmpCalendarDraw_DrawMonthDisplay_NextMonthColor_SIG = "66 C7 85 E8 00 00 00 43 04 41 0F 28 D0 C6 85 EA 00 00 00 08 40 88 BD ?? ?? ?? ?? 48 89 44 24 ?? E8 ?? ?? ?? ?? 41 0F B6 86 ?? ?? ?? ??";
         // Inside UUICmpCalendarDraw::DrawDayEvents
-        private string UUICmpCalendar_DrawDayEvents_DateBg_SIG = "66 0F 6E C8 8B 87 ?? ?? ?? ?? 03 87 ?? ?? ?? ??";
+        private string UUICmpCalendar_DrawDayEvents_DateBg_SIG = "66 C7 45 ?? FF F9 0F 28 D7 C6 45 ?? 4F 66 0F 6E C8 8B 87 ?? ?? ?? ?? 03 87 ?? ?? ?? ??";
         private string UUICmpCalendar_DrawDayEvents_DrawTextColor_SIG = "";
         // UUICmpCalendarDraw::DrawPartTimeJobDescBg
         private string UUICmpCalendarDraw_PartTimeJobDescBgColor_SIG = "C7 84 24 ?? ?? ?? ?? 62 15 00 FF";
@@ -1634,10 +1562,6 @@ namespace p3rpc.femc.Components
 
         private IAsmHook _calendarSundayColor;
         private IAsmHook _calendarSundayDay;
-        private IAsmHook _monthsPrevMonth;
-        private IAsmHook _monthsCurrMonth;
-        private IAsmHook _monthsNextMonth;
-        private IAsmHook _dateBg;
 
         private IAsmHook _LeftArrowRed1;
         private IAsmHook _LeftArrowGreen1;
@@ -1687,39 +1611,41 @@ namespace p3rpc.femc.Components
 
             _context._utils.SigScan(UUICmpCalendarDraw_DrawMonthDisplay_PrevMonthColor_SIG, "UUICmpCalendarDraw::DrawMonthDisplay_PrevMonth", _context._utils.GetDirectAddress, addr =>
             {
-                string[] function =
-                {
-                    "use64",
-                    $"mov dword [rbp + 0xe8], {_context._config.CampCalendarTextColor.ToU32ARGB()}"
-                };
-                _monthsPrevMonth = _context._hooks.CreateAsmHook(function, addr, AsmHookBehaviour.ExecuteFirst).Activate();
+                // Edit only the RGB initializer immediates. Keep native opacity and
+                // the adjacent draw call intact instead of relocating it in a detour.
+                _asmMemWrites.Add(new AddressToMemoryWrite(_context._memory, (nuint)addr + 7,
+                    address => _context._memory.Write(address, (ushort)
+                        (_context._config.CampCalendarTextColor.B | (_context._config.CampCalendarTextColor.G << 8)))));
+                _asmMemWrites.Add(new AddressToMemoryWrite(_context._memory, (nuint)addr + 15,
+                    address => _context._memory.Write(address, _context._config.CampCalendarTextColor.R)));
             });
             _context._utils.SigScan(UUICmpCalendarDraw_DrawMonthDisplay_CurrMonthColor_SIG, "UUICmpCalendarDraw::DrawMonthDisplay_CurrMonth", _context._utils.GetDirectAddress, addr =>
             {
-                string[] function =
-                {
-                    "use64",
-                    $"mov dword [rbp + 0xe8], {_context._config.CampCalendarTextColor.ToU32ARGB()}"
-                };
-                _monthsCurrMonth = _context._hooks.CreateAsmHook(function, addr, AsmHookBehaviour.ExecuteFirst).Activate();
+                // Edit only the RGB initializer immediates. Keep native opacity and
+                // the adjacent draw call intact instead of relocating it in a detour.
+                _asmMemWrites.Add(new AddressToMemoryWrite(_context._memory, (nuint)addr + 7,
+                    address => _context._memory.Write(address, (ushort)
+                        (_context._config.CampCalendarTextColor.B | (_context._config.CampCalendarTextColor.G << 8)))));
+                _asmMemWrites.Add(new AddressToMemoryWrite(_context._memory, (nuint)addr + 15,
+                    address => _context._memory.Write(address, _context._config.CampCalendarTextColor.R)));
             });
             _context._utils.SigScan(UUICmpCalendarDraw_DrawMonthDisplay_NextMonthColor_SIG, "UUICmpCalendarDraw::DrawMonthDisplay_NextMonth", _context._utils.GetDirectAddress, addr =>
             {
-                string[] function =
-                {
-                    "use64",
-                    $"mov dword [rbp + 0xe8], {_context._config.CampCalendarTextColor.ToU32ARGB()}"
-                };
-                _monthsNextMonth = _context._hooks.CreateAsmHook(function, addr, AsmHookBehaviour.ExecuteFirst).Activate();
+                // Edit only the RGB initializer immediates. Keep native opacity and
+                // the adjacent draw call intact instead of relocating it in a detour.
+                _asmMemWrites.Add(new AddressToMemoryWrite(_context._memory, (nuint)addr + 7,
+                    address => _context._memory.Write(address, (ushort)
+                        (_context._config.CampCalendarTextColor.B | (_context._config.CampCalendarTextColor.G << 8)))));
+                _asmMemWrites.Add(new AddressToMemoryWrite(_context._memory, (nuint)addr + 19,
+                    address => _context._memory.Write(address, _context._config.CampCalendarTextColor.R)));
             });
             _context._utils.SigScan(UUICmpCalendar_DrawDayEvents_DateBg_SIG, "UUICmpCalendarDraw::DrawDayEvents_DateBg", _context._utils.GetDirectAddress, addr =>
             {
-                string[] function =
-                {
-                    "use64",
-                    $"mov dword [rbp + 0x6f], {_context._config.CampCalendarHighlightColor.ToU32ARGB()}"
-                };
-                _dateBg = _context._hooks.CreateAsmHook(function, addr, AsmHookBehaviour.ExecuteFirst).Activate();
+                _asmMemWrites.Add(new AddressToMemoryWrite(_context._memory, (nuint)addr + 4,
+                    address => _context._memory.Write(address, (ushort)
+                        (_context._config.CampCalendarHighlightColor.B | (_context._config.CampCalendarHighlightColor.G << 8)))));
+                _asmMemWrites.Add(new AddressToMemoryWrite(_context._memory, (nuint)addr + 12,
+                    address => _context._memory.Write(address, _context._config.CampCalendarHighlightColor.R)));
             });
 
             _context._utils.SigScan(UUICmpCalendarDraw_PartTimeJobDescBg_SIG, "UUICmpCalendarDraw::PartTimeJobDescBg", _context._utils.GetDirectAddress, addr => _drawPartTimeJobBg = _context._utils.MakeHooker<UUICmpCalendarDraw_DrawUIComponent>(UUICmpCalendarDraw_PartTimeJobDescBg, addr));
@@ -1730,8 +1656,10 @@ namespace p3rpc.femc.Components
                 string[] function =
                 {
                     "use64",
+                    "push rbx",
                     $"mov ebx, 0x{BitConverter.SingleToInt32Bits((float)_context._config.CampHighlightedLowerColor.R):X}",
                     "movd xmm0, ebx",
+                    "pop rbx",
                 };
                 _LeftArrowRed1 = _context._hooks.CreateAsmHook(function, addr, AsmHookBehaviour.ExecuteFirst).Activate();
             });
@@ -1740,8 +1668,10 @@ namespace p3rpc.femc.Components
                 string[] function =
                 {
                     "use64",
+                    "push rbx",
                     $"mov ebx, 0x{BitConverter.SingleToInt32Bits((float)_context._config.CampHighlightedLowerColor.G):X}",
                     "movd xmm0, ebx",
+                    "pop rbx",
                 };
                 _LeftArrowGreen1 = _context._hooks.CreateAsmHook(function, addr, AsmHookBehaviour.ExecuteFirst).Activate();
             });
@@ -1750,8 +1680,10 @@ namespace p3rpc.femc.Components
                 string[] function =
                 {
                     "use64",
+                    "push rbx",
                     $"mov ebx, 0x{BitConverter.SingleToInt32Bits((float)_context._config.CampHighlightedLowerColor.B):X}",
                     "movd xmm0, ebx",
+                    "pop rbx",
                 };
                 _LeftArrowBlue1 = _context._hooks.CreateAsmHook(function, addr, AsmHookBehaviour.ExecuteFirst).Activate();
             });
@@ -1796,8 +1728,10 @@ namespace p3rpc.femc.Components
                 string[] function =
                 {
                     "use64",
+                    "push rbx",
                     $"mov ebx, 0x{BitConverter.SingleToInt32Bits((float)_context._config.CampHighlightedLowerColor.R):X}",
                     "movd xmm0, ebx",
+                    "pop rbx",
                 };
                 _RightArrowRed1 = _context._hooks.CreateAsmHook(function, addr, AsmHookBehaviour.ExecuteFirst).Activate();
             });
@@ -1806,8 +1740,10 @@ namespace p3rpc.femc.Components
                 string[] function =
                 {
                     "use64",
+                    "push rbx",
                     $"mov ebx, 0x{BitConverter.SingleToInt32Bits((float)_context._config.CampHighlightedLowerColor.G):X}",
                     "movd xmm0, ebx",
+                    "pop rbx",
                 };
                 _RightArrowGreen1 = _context._hooks.CreateAsmHook(function, addr, AsmHookBehaviour.ExecuteFirst).Activate();
             });
@@ -1816,8 +1752,10 @@ namespace p3rpc.femc.Components
                 string[] function =
                 {
                     "use64",
+                    "push rbx",
                     $"mov ebx, 0x{BitConverter.SingleToInt32Bits((float)_context._config.CampHighlightedLowerColor.B):X}",
                     "movd xmm0, ebx",
+                    "pop rbx",
                 };
                 _RightArrowBlue1 = _context._hooks.CreateAsmHook(function, addr, AsmHookBehaviour.ExecuteFirst).Activate();
             });
@@ -1994,8 +1932,7 @@ namespace p3rpc.femc.Components
     {
         private string UCmpSystemDraw_GetMenuColors_SIG = "43 8B 94 ?? ?? ?? ?? ?? 41 0F 28 D4";
         private string UCmpSystemDraw_DrawUnhighlightedMenuOptionsStart_SIG = "B9 00 9F 3E 04";
-        private string UCmpSystemDraw_DrawUnhighlightedMenuOptions_SIG = "48 8B C4 48 89 58 ?? 44 89 48 ?? 44 89 40 ?? 55 56 57 41 54 41 55 41 56 41 57 48 81 EC 40 01 00 00";
-        private string UCmpSystemDraw_GetMenuColorNoSelect_SIG = "4D 8B 24 ?? 83 FB 06"; // or edi, 0x13389500
+        private string UCmpSystemDraw_GetMenuColorNoSelect_SIG = "81 CF 00 95 38 13 4D 8B 24 ?? 83 FB 06"; // or edi, 0x13389500
         //private string UCmpSystemDraw_GetMenuColorNoSelect_SIG = "81 CF 00 95 38 13"; // or edi, 0x13389500
         private string UCmpSystemDraw_DrawCurveColor_SIG = "C7 84 24 ?? ?? ?? ?? C1 29 0B FF";
         private string UCmpSystemDraw_DrawFemcShadowColor1_SIG = "C7 44 24 ?? FF B7 A4 9A 41 0F 28 DA";
@@ -2033,10 +1970,6 @@ namespace p3rpc.femc.Components
         private string UCmpSystemConfigDraw_ArrowGreen2_SIG = "E8 ?? ?? ?? ?? F3 0F 2C D8 41 0F 28 C1 41 0F 28 D1 41 0F 28 CF";
         private string UCmpSystemConfigDraw_ArrowBlue2_SIG = "E8 ?? ?? ?? ?? 49 8B 0E 41 0F 28 FC";
 
-        private IHook<UCmpSystemDraw_DrawUnhighlightedMenuOptions> _drawUnhighlightOptions;
-        private IAsmHook _getMenuColorNoSel;
-        private IReverseWrapper<UCmpSystemDraw_GetMenuColorNoSelect> _getMenuColorNoSelWrapper;
-
         private IAsmHook _drawNoTutoBigNone;
         private IAsmHook _drawTutoDictHighlightedColor;
 
@@ -2063,7 +1996,6 @@ namespace p3rpc.femc.Components
         private IAsmHook _ArrowGreen2;
         private IAsmHook _ArrowBlue2;
 
-        private unsafe FSprColor* _systemOptionColors;
         private static int SystemOptionCount = 7;
 
         private UICommon _uiCommon;
@@ -2074,17 +2006,23 @@ namespace p3rpc.femc.Components
             {
                 _asmMemWrites.Add(new AddressToMemoryWrite(_context._memory, (nuint)addr, addr => _context._memory.Write(addr + 1, _context._config.CampSystemStartFadeColor.ToU32IgnoreAlpha())));
             });
-            _context._utils.SigScan(UCmpSystemDraw_DrawUnhighlightedMenuOptions_SIG, "UCmpSystemDraw::DrawUnhighlightedMenuOptions", _context._utils.GetDirectAddress, addr => _drawUnhighlightOptions = _context._utils.MakeHooker<UCmpSystemDraw_DrawUnhighlightedMenuOptions>(UCmpSystemDraw_DrawUnhighlightedMenuOptionsImpl, addr));
-            _context._utils.SigScan(UCmpSystemDraw_GetMenuColors_SIG, "UCmpSystemDraw_MenuOptionColors", trans => (nuint)(_context._baseAddress + *(int*)(_context._baseAddress + trans + 4)), addr => _systemOptionColors = (FSprColor*)addr);
+            _context._utils.SigScan(UCmpSystemDraw_GetMenuColors_SIG, "UCmpSystemDraw_MenuOptionColors",
+                trans => (nuint)(_context._baseAddress + *(int*)(_context._baseAddress + trans + 4)), addr =>
+                {
+                    // The native renderer reads this seven-entry color table.
+                    // Update it at startup/config changes, without a per-frame detour.
+                    for (int i = 0; i < SystemOptionCount; i++)
+                    {
+                        var entry = i;
+                        _asmMemWrites.Add(new AddressToMemoryWrite(_context._memory, (nuint)addr + (nuint)(i * sizeof(uint)),
+                            address => _context._memory.Write(address, GetMatchingColorForEntry(entry))));
+                    }
+                });
             _context._utils.SigScan(UCmpSystemDraw_GetMenuColorNoSelect_SIG, "UCmpSystemDraw::GetMenuColorNoSelect", _context._utils.GetDirectAddress, addr =>
             {
-                string[] function =
-                {
-                    "use64",
-                    //$"{_context._hooks.Utilities.GetAbsoluteCallMnemonics(UCmpSystemDraw_GetMenuColorNoSelectImpl, out _getMenuColorNoSelWrapper)}",
-                    $"mov edi, {_context._config.CampMenuItemColorNoSel.ToU32()}"
-                };
-                _getMenuColorNoSel = _context._hooks.CreateAsmHook(function, addr, AsmHookBehaviour.ExecuteFirst).Activate();
+                // OR in RGB while retaining the native fade alpha in DIL.
+                _asmMemWrites.Add(new AddressToMemoryWrite(_context._memory, (nuint)addr + 2,
+                    address => _context._memory.Write(address, _context._config.CampMenuSystemItemColorNoSel.ToU32IgnoreAlpha())));
             });
             _context._utils.SigScan(UCmpSystemDraw_DrawCurveColor_SIG, "UCmpSystemDraw::DrawCurveColor", _context._utils.GetDirectAddress, addr =>
             {
@@ -2381,15 +2319,5 @@ namespace p3rpc.femc.Components
             else /*(entryId % 3 == 2)*/ return ConfigColor.ToFSprColor(_context._config.CampMenuSystemItemColor3);
         }
 
-        private unsafe FSprColor UCmpSystemDraw_GetMenuColorNoSelectImpl() => ConfigColor.ToFSprColor(_context._config.CampMenuSystemItemColorNoSel);
-
-        private unsafe void UCmpSystemDraw_DrawUnhighlightedMenuOptionsImpl(UCmpSystemDraw* self, UCmpSystemSystem* sys, uint activeId, uint queueId)
-        {
-            for (int i = 0; i < SystemOptionCount; i++) _systemOptionColors[i] = GetMatchingColorForEntry(i);
-            _drawUnhighlightOptions.OriginalFunction(self, sys, activeId, queueId);
-        }
-        private unsafe delegate void UCmpSystemDraw_DrawUnhighlightedMenuOptions(UCmpSystemDraw* self, UCmpSystemSystem* sys, uint activeId, uint queueId);
-        [Function(new Register[] {}, FunctionAttribute.Register.rdi, false)]
-        private unsafe delegate FSprColor UCmpSystemDraw_GetMenuColorNoSelect();
     }
 }

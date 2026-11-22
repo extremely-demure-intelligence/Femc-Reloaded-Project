@@ -1,1 +1,14 @@
 name: Nobara Anime Opening
+
+base:
+  mesh_path: /Game/Xrd777/Characters/Player/FemC/Femc_Skeleton
+
+costume:
+  anim_path: None
+
+hair:
+  anim_path: None
+
+face:
+  anim_path: None
+  mesh_path: /Game/Xrd777/Characters/Player/FemC/Femc_Face

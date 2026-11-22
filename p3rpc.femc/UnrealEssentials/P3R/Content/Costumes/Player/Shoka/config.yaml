@@ -1,8 +1,17 @@
 name: "Mr Mew Hoodie"
 
 costume:
+  anim_path: None
   mesh_path: /Game/Costumes/Player/Shoka/costume-mesh.uasset
 
 
 hair:
+  anim_path: None
   mesh_path: /Game/Costumes/Player/Shoka/hair-mesh.uasset
+
+base:
+  mesh_path: /Game/Xrd777/Characters/Player/FemC/Femc_Skeleton
+
+face:
+  anim_path: None
+  mesh_path: /Game/Xrd777/Characters/Player/FemC/Femc_Face

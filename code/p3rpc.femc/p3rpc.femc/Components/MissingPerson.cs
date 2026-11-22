@@ -12,7 +12,7 @@ using System.Threading.Tasks;
 
 namespace p3rpc.femc.Components
 {
-    public class MissingPerson : ModuleAsmInlineColorEdit<FemcContext>
+    public class MissingPerson : NativeColorModule
     {
         private string UUIMissingPerson_DrawPageBackground_SIG = "48 8D 8F ?? ?? ?? ?? 89 45 ?? E8 ?? ?? ?? ?? F3 0F 59 05 ?? ?? ?? ??";
         // UUIMissingPerson::DrawMissingPersonRows
@@ -43,13 +43,13 @@ namespace p3rpc.femc.Components
         private string UUIMissingPerson_QuestToggler_SIG = "E8 ?? ?? ?? ?? 89 85 ?? ?? ?? ?? 4D 8B 46 ??";
 
         private IAsmHook _lastSight;
-        private IReverseWrapper<UUIMissingPerson_InjectColorAfterCtorCall> _lastSightWrapper;
+
         private IAsmHook _pageBg;
-        private IReverseWrapper<UUIMissingPerson_InjectColorAfterCtorCall> _pageBgWrapper;
+
         private IAsmHook _completeText;
-        private IReverseWrapper<UUIMissingPerson_InjectColorAfterCtorCall> _completeTextWrapper;
+
         private IAsmHook _completeBg;
-        private IReverseWrapper<UUIMissingPerson_InjectColorAfterCtorCall> _completeBgWrapper;
+
         private IHook<UUIMissingPerson_DrawLabelRow> _drawLabelRow;
         private IHook<UUIMissingPerson_DrawLabelRow> _drawMissingPersonDetails;
         private UUIMissingPerson_DrawPersonEntry _drawPersonEntry;
@@ -62,7 +62,7 @@ namespace p3rpc.femc.Components
         private IAsmHook _CursorColor;
         private IAsmHook _DetailCursorColor;
         private IAsmHook _BackCampMenuChairAndKotone;
-        private IAsmHook _DetailBackCampMenuChairAndKotone;
+        private readonly List<IAsmHook> _DetailBackCampMenuChairAndKotone = new();
         private IAsmHook _QuestToggler;
         private IAsmHook _DrawLastSightedNullDescription;
 
@@ -71,38 +71,22 @@ namespace p3rpc.femc.Components
         {
             _context._utils.SigScan(UUIMissingPerson_SelectedPersonLastSighted_SIG, "UUIMissingPerson::SelectedPersonLastSighted", _context._utils.GetDirectAddress, addr =>
             {
-                string[] function =
-                {
-                    "use64",
-                    $"{_context._hooks.Utilities.GetAbsoluteCallMnemonics(UUIMissingPerson_SelectedPersonLastSighted, out _lastSightWrapper)}",
-                };
+                var function = ColorInRegister(() => _context._config.MissingLastSighted);
                 _lastSight = _context._hooks.CreateAsmHook(function, addr, AsmHookBehaviour.ExecuteFirst).Activate();
             });
             _context._utils.SigScan(UUIMissingPerson_DrawPageBackground_SIG, "UUIMissingPerson::DrawPageBackground", _context._utils.GetDirectAddress, addr =>
             {
-                string[] function =
-                {
-                    "use64",
-                    $"{_context._hooks.Utilities.GetAbsoluteCallMnemonics(UUIMissingPerson_PageBackground, out _pageBgWrapper)}",
-                };
+                var function = ColorInRegister(() => _context._config.MissingPageBg);
                 _pageBg = _context._hooks.CreateAsmHook(function, addr, AsmHookBehaviour.ExecuteFirst).Activate();
             });
             _context._utils.SigScan(UUIMissingPerson_DrawCompleteText_SIG, "UUIMissingPerson::DrawCompleteText", _context._utils.GetDirectAddress, addr =>
             {
-                string[] function =
-                {
-                    "use64",
-                    $"{_context._hooks.Utilities.GetAbsoluteCallMnemonics(UUIMissingPerson_DrawCompleteText, out _completeTextWrapper)}",
-                };
+                var function = ColorInRegister(() => new ConfigColor(0x76, 0x17, 0x37, 0xff));
                 _completeText = _context._hooks.CreateAsmHook(function, addr, AsmHookBehaviour.ExecuteFirst).Activate();
             });
             _context._utils.SigScan(UUIMissingPerson_DrawCompleteBg_SIG, "UUIMissingPerson::DrawCompleteBg", _context._utils.GetDirectAddress, addr =>
             {
-                string[] function =
-                {
-                    "use64",
-                    $"{_context._hooks.Utilities.GetAbsoluteCallMnemonics(UUIMissingPerson_DrawCompleteBg, out _completeBgWrapper)}",
-                };
+                var function = ColorInRegister(() => new ConfigColor(0x33, 0, 0x15, 0xff));
                 _completeBg = _context._hooks.CreateAsmHook(function, addr, AsmHookBehaviour.ExecuteFirst).Activate();
             });
             _context._utils.SigScan(UUIMissingPerson_DrawPersonEntry_SIG, "UUIMissingPerson::DrawPersonEntry", _context._utils.GetDirectAddress, addr => _drawPersonEntry = _context._utils.MakeWrapper<UUIMissingPerson_DrawPersonEntry>(addr));
@@ -160,7 +144,7 @@ namespace p3rpc.femc.Components
                     $"mov dl, ${_context._config.MissingDetailFemcChairsShadow.G:X}",
                     $"mov cl, ${_context._config.MissingDetailFemcChairsShadow.R:X}"
                 };
-                _DetailBackCampMenuChairAndKotone = _context._hooks.CreateAsmHook(function, addr, AsmHookBehaviour.ExecuteFirst).Activate();
+                _DetailBackCampMenuChairAndKotone.Add(_context._hooks.CreateAsmHook(function, addr, AsmHookBehaviour.ExecuteFirst).Activate());
             });
 
             _context._utils.SigScan(UUIMissingPerson_DetailBackCampMenuChairAndKotone2_SIG, "UUIMissingPerson::DetailBackCampMenuChairAndKotone2", _context._utils.GetDirectAddress, addr =>
@@ -172,7 +156,7 @@ namespace p3rpc.femc.Components
                     $"mov dl, ${_context._config.MissingDetailFemcChairsShadow.G:X}",
                     $"mov cl, ${_context._config.MissingDetailFemcChairsShadow.R:X}"
                 };
-                _DetailBackCampMenuChairAndKotone = _context._hooks.CreateAsmHook(function, addr, AsmHookBehaviour.ExecuteFirst).Activate();
+                _DetailBackCampMenuChairAndKotone.Add(_context._hooks.CreateAsmHook(function, addr, AsmHookBehaviour.ExecuteFirst).Activate());
             });
 
             _context._utils.SigScan(UUIMissingPerson_QuestToggler_SIG, "UUIMissingPerson::QuestToggler", _context._utils.GetDirectAddress, addr =>
@@ -416,13 +400,7 @@ namespace p3rpc.femc.Components
                 _uiCommon._spriteFunc2(&lastSightIdk, masker, campSprite, 0, 0);
             }
         }
-        public unsafe FSprColor UUIMissingPerson_SelectedPersonLastSighted(FSprColor source) => ConfigColor.ToFSprColorWithAlpha(_context._config.MissingLastSighted, source.A);
-        public unsafe FSprColor UUIMissingPerson_PageBackground(FSprColor source) => ConfigColor.ToFSprColorWithAlpha(_context._config.MissingPageBg, source.A);
-        public unsafe FSprColor UUIMissingPerson_DrawCompleteText(FSprColor source) => new FSprColor(0x76, 0x17, 0x37, source.A);
-        public unsafe FSprColor UUIMissingPerson_DrawCompleteBg(FSprColor source) => new FSprColor(0x33, 0x0, 0x15, source.A);
 
-        [Function(FunctionAttribute.Register.rax, FunctionAttribute.Register.rax, false)]
-        public unsafe delegate FSprColor UUIMissingPerson_InjectColorAfterCtorCall(FSprColor source);
         public unsafe delegate void UUIMissingPerson_DrawLabelRow(UUIMissingPerson* self, nint masker);
         public unsafe delegate void UUIMissingPerson_DrawPersonEntry(UUIMissingPerson* self, nint masker, FVector* pos, FMissingEntry* entry, byte a5, float a6);
         public unsafe delegate byte UGlobalWork_CheckDisappearEntryValid(ushort id);

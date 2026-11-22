@@ -11,7 +11,7 @@ using System.Threading.Tasks;
 
 namespace p3rpc.femc.Components
 {
-    class Requests : ModuleBase<FemcContext>
+    class Requests : ModuleAsmInlineColorEdit<FemcContext>
     {
         private string AUIRequest_BackCardColor_SIG = "E8 ?? ?? ?? ?? 4C 8B 86 ?? ?? ?? ?? 48 8D 4D ?? 0F 57 DB F3 0F 11 7C 24 ?? 49 8B D6 89 45 ?? E8 ?? ?? ?? ?? BA 01 00 00 00";
         private string AUIRequest_BackSquaresColor_SIG = "E8 ?? ?? ?? ?? 4C 8B 86 ?? ?? ?? ?? 48 8D 4C 24 ?? 0F 57 DB F3 0F 11 7C 24 ?? 49 8B D6 89 45 ?? E8 ?? ?? ?? ?? 0F 28 45 ??";
@@ -32,7 +32,7 @@ namespace p3rpc.femc.Components
         private string AUIRequest_DifficultyRankDown_SIG = "E8 ?? ?? ?? ?? F3 0F 10 05 ?? ?? ?? ?? 49 8B CE F3 0F 10 1D ?? ?? ?? ??";
         private string AUIRequest_DifficultyIndicatorButterfly1_SIG = "E8 ?? ?? ?? ?? 41 B1 FF 89 06";
         private string AUIRequest_DifficultyIndicatorButterfly2_SIG = "E8 ?? ?? ?? ?? 41 B1 FF 89 83 ?? ?? ?? ?? 41 B0 7F";
-        private string AUIRequest_DifficultyIndicatorButterfly34_SIG = "E8 ?? ?? ?? ?? 41 B1 FF 89 83 ?? ?? ?? ?? 41 B0 73 B2 2D B1 0E E8 ?? ?? ?? ??";
+        private string AUIRequest_DifficultyIndicatorButterfly34_SIG = "E8 ?? ?? ?? ?? 41 B1 FF 89 83 ?? ?? ?? ?? 41 B0 73 B2 2D B1 0E E8 ?? ?? ?? ?? 41 B1 FF";
         private string AUIRequest_DifficultyIndicatorButterfly5_SIG = "E8 ?? ?? ?? ?? 0F 28 05 ?? ?? ?? ?? 0F 57 C9 F3 0F 10 B5 ?? ?? ?? ??";
         private string AUIRequest_DifficultyFont_SIG = "E8 ?? ?? ?? ?? F3 44 0F 58 15 ?? ?? ?? ?? F3 44 0F 58 1D ?? ?? ?? ?? 4C 8B 83 ?? ?? ?? ??";
 
@@ -40,7 +40,7 @@ namespace p3rpc.femc.Components
         private string AUIRequest_FontStatusTag_SIG = "E8 ?? ?? ?? ?? 41 B0 FC 89 44 24 ??";
         private string AUIRequest_StatusTagUnderlay_SIG = "E8 ?? ?? ?? ?? 33 D2 89 85 ?? ?? ?? ?? 48 8B 83 ?? ?? ?? ??";
 
-        private string AUIRequest_NumberColumn_SIG = "C7 45 ?? 62 03 00 00 E8 ?? ?? ?? ??";
+        private string AUIRequest_NumberColumn_SIG = "B2 72 F3 0F 11 74 24 ?? 0F B6 CA F3 44 0F 11 54 24 ?? 45 0F B6 CE 0F 29 44 24 ?? 41 B0 99 48 C7 44 24 ?? 00 00 00 00 66 0F 7F 4D ?? C7 44 24 ?? 00 00 00 00 C7 44 24 ?? 00 00 80 3F C7 44 24 ?? 00 00 80 3F C7 44 24 ?? 00 00 00 00 48 C7 45 ?? 00 00 80 3F 89 5C 24 ?? C7 44 24 ?? 00 00 80 3F 89 5D ?? C7 44 24 ?? 00 00 80 3F 89 5D ?? C7 45 ?? 62 03 00 00 E8 ?? ?? ?? ??";
         private string AUIRequest_QuestColumn_SIG = "E8 ?? ?? ?? ?? 4C 8B 87 ?? ?? ?? ?? 48 8D 4C 24 ?? 0F 57 DB F3 0F 11 7C 24 ?? 48 8B D6 89 44 24 ?? E8 ?? ?? ?? ?? 0F 28 B4 24 ?? ?? ?? ??";
         private string AUIRequest_DateColumn_SIG = "E8 ?? ?? ?? ?? 4C 8B 87 ?? ?? ?? ?? 48 8D 4C 24 ?? 0F 57 DB F3 0F 11 7C 24 ?? 48 8B D6 89 44 24 ?? E8 ?? ?? ?? ?? 83 BF ?? ?? ?? ?? 01";
         private string AUIRequest_StatusColumn_SIG = "E8 ?? ?? ?? ?? 89 44 24 ?? 48 8D 4C 24 ?? 4C 8B 87 ?? ?? ?? ??";
@@ -73,12 +73,11 @@ namespace p3rpc.femc.Components
         private IAsmHook _RequestsDetailCursorColor;
         private IAsmHook _DifficultyRankUp;
         private IAsmHook _DifficultyRankDown;
-        private IAsmHook _DifficultyIndicatorButterfly;
+        private readonly List<IAsmHook> _difficultyIndicatorHooks = new();
         private IAsmHook _DifficultyFont;
         private IAsmHook _FontAndStatusTagBackground;
         private IAsmHook _FontStatusTag;
         private IAsmHook _StatusTagUnderlay;
-        private IAsmHook _NumberColumn;
         private IAsmHook _QuestColumn;
         private IAsmHook _DateColumn;
         private IAsmHook _StatusColumn;
@@ -292,7 +291,7 @@ namespace p3rpc.femc.Components
                     $"mov dl, ${_context._config.RequestDifficultyIndicator.G:X}",
                     $"mov cl, ${_context._config.RequestDifficultyIndicator.R:X}"
                 };
-                _DifficultyIndicatorButterfly = _context._hooks.CreateAsmHook(function, addr, AsmHookBehaviour.ExecuteFirst).Activate();
+                _difficultyIndicatorHooks.Add(_context._hooks.CreateAsmHook(function, addr, AsmHookBehaviour.ExecuteFirst).Activate());
             });
 
             _context._utils.SigScan(AUIRequest_DifficultyIndicatorButterfly2_SIG, "AUIRequest::DifficultyIndicatorButterfly2", _context._utils.GetDirectAddress, addr =>
@@ -304,7 +303,7 @@ namespace p3rpc.femc.Components
                     $"mov dl, ${_context._config.RequestDifficultyIndicator.G:X}",
                     $"mov cl, ${_context._config.RequestDifficultyIndicator.R:X}"
                 };
-                _DifficultyIndicatorButterfly = _context._hooks.CreateAsmHook(function, addr, AsmHookBehaviour.ExecuteFirst).Activate();
+                _difficultyIndicatorHooks.Add(_context._hooks.CreateAsmHook(function, addr, AsmHookBehaviour.ExecuteFirst).Activate());
             });
 
             _context._utils.SigScan(AUIRequest_DifficultyIndicatorButterfly34_SIG, "AUIRequest::DifficultyIndicatorButterfly34", _context._utils.GetDirectAddress, addr =>
@@ -316,8 +315,8 @@ namespace p3rpc.femc.Components
                     $"mov dl, ${_context._config.RequestDifficultyIndicator.G:X}",
                     $"mov cl, ${_context._config.RequestDifficultyIndicator.R:X}"
                 };
-                _DifficultyIndicatorButterfly = _context._hooks.CreateAsmHook(function, addr, AsmHookBehaviour.ExecuteFirst).Activate();
-                _DifficultyIndicatorButterfly = _context._hooks.CreateAsmHook(function, addr + 21, AsmHookBehaviour.ExecuteFirst).Activate();
+                _difficultyIndicatorHooks.Add(_context._hooks.CreateAsmHook(function, addr, AsmHookBehaviour.ExecuteFirst).Activate());
+                _difficultyIndicatorHooks.Add(_context._hooks.CreateAsmHook(function, addr + 21, AsmHookBehaviour.ExecuteFirst).Activate());
             });
 
             _context._utils.SigScan(AUIRequest_DifficultyIndicatorButterfly5_SIG, "AUIRequest::DifficultyIndicatorButterfly5", _context._utils.GetDirectAddress, addr =>
@@ -329,7 +328,7 @@ namespace p3rpc.femc.Components
                     $"mov dl, ${_context._config.RequestDifficultyIndicator.G:X}",
                     $"mov cl, ${_context._config.RequestDifficultyIndicator.R:X}"
                 };
-                _DifficultyIndicatorButterfly = _context._hooks.CreateAsmHook(function, addr, AsmHookBehaviour.ExecuteFirst).Activate();
+                _difficultyIndicatorHooks.Add(_context._hooks.CreateAsmHook(function, addr, AsmHookBehaviour.ExecuteFirst).Activate());
             });
 
             _context._utils.SigScan(AUIRequest_DifficultyFont_SIG, "AUIRequest::DifficultyFont", _context._utils.GetDirectAddress, addr =>
@@ -361,27 +360,18 @@ namespace p3rpc.femc.Components
                 string[] function =
                 {
                     "use64",
+                    "pushfq",
                     "cmp cl, 0x67",
                     "jne not_pink",
                     $"mov r8b, ${_context._config.RequestStatusFontTagBack.B:X}",
                     $"mov dl, ${_context._config.RequestStatusFontTagBack.G:X}",
                     $"mov cl, ${_context._config.RequestStatusFontTagBack.R:X}",
-                    "not_pink:"
+                    "not_pink:",
+                    "popfq"
                 };
                 _FontAndStatusTagBackground = _context._hooks.CreateAsmHook(function, addr, AsmHookBehaviour.ExecuteFirst).Activate();
             });
 
-            _context._utils.SigScan(AUIRequest_FontStatusTag_SIG, "AUIRequest::FontStatusTag", _context._utils.GetDirectAddress, addr =>
-            {
-                string[] function =
-                {
-                    "use64",
-                    $"mov r8b, ${_context._config.RequestStatusTagFont.B:X}",
-                    $"mov dl, ${_context._config.RequestStatusTagFont.G:X}",
-                    $"mov cl, ${_context._config.RequestStatusTagFont.R:X}"
-                };
-                _FontStatusTag = _context._hooks.CreateAsmHook(function, addr, AsmHookBehaviour.ExecuteFirst).Activate();
-            });
 
             _context._utils.SigScan(AUIRequest_StatusTagUnderlay_SIG, "AUIRequest::StatusTagUnderlay", _context._utils.GetDirectAddress, addr =>
             {
@@ -397,14 +387,20 @@ namespace p3rpc.femc.Components
 
             _context._utils.SigScan(AUIRequest_NumberColumn_SIG, "AUIRequest::NumberColumn", _context._utils.GetDirectAddress, addr =>
             {
-                string[] function =
-                {
-                    "use64",
-                    $"mov r8b, ${_context._config.DataColumnColor.B:X}",
-                    $"mov dl, ${_context._config.DataColumnColor.G:X}",
-                    $"mov cl, ${_context._config.DataColumnColor.R:X}"
-                };
-                _NumberColumn = _context._hooks.CreateAsmHook(function, addr, AsmHookBehaviour.ExecuteFirst).Activate();
+                // The quest-menu crash reported RIP at the constructor call formerly
+                // adjacent to this detour. Keep the call and surrounding control flow
+                // intact: replace only RGB argument setup, retaining R9B's fade alpha.
+                _asmMemWrites.Add(new AddressToMemoryWrite(_context._memory, (nuint)(addr + 1),
+                    address => _context._memory.Write(address, _context._config.DataColumnColor.G)));
+                // movzx ecx, dl -> mov cl, red; nop. The native constructor consumes CL.
+                _asmMemWrites.Add(new AddressToMemoryWrite(_context._memory, (nuint)(addr + 8),
+                    address =>
+                    {
+                        _context._memory.Write(address, (ushort)(0xB1 | (_context._config.DataColumnColor.R << 8)));
+                        _context._memory.Write(address + 2, (byte)0x90);
+                    }));
+                _asmMemWrites.Add(new AddressToMemoryWrite(_context._memory, (nuint)(addr + 29),
+                    address => _context._memory.Write(address, _context._config.DataColumnColor.B)));
             });
 
             _context._utils.SigScan(AUIRequest_QuestColumn_SIG, "AUIRequest::QuestColumn", _context._utils.GetDirectAddress, addr =>

@@ -12,16 +12,16 @@ using System.Threading.Tasks;
 
 namespace p3rpc.femc.Components
 {   
-    public class Cutin : ModuleAsmInlineColorEdit<FemcContext>
+    public class Cutin : NativeColorModule
     {
         private string ACutinDraw_DrawPortraitBustupShadowColor_SIG = "44 8B C8 41 B8 02 00 00 00";
         private string ACutinDraw_DrawOuterTriangleHiglhightColor_SIG = "0F 57 DB 89 87 ?? ?? ?? ?? 0F 57 D2 C6 87 ?? ?? ?? ?? 01";
         private string ACutinDraw_DrawEmotion_SIG = "45 85 C0 0F 84 ?? ?? ?? ?? 48 89 5C 24 ?? 48 89 7C 24 ?? 55";
 
         private IAsmHook _drawPortraitBustupShadowColor;
-        private IReverseWrapper<ACutinDraw_InjectColorAfterCtorCall> _drawPortraitBustupWrapper;
+
         private IAsmHook _drawOuterTriangleHiglhightColor;
-        private IReverseWrapper<ACutinDraw_InjectColorAfterCtorCall> _drawOuterTriangleWrapper;
+
         private IHook<ACutinDraw_CutinDrawEmotion> _drawEmotion;
 
         private UICommon _uiCommon;
@@ -30,20 +30,12 @@ namespace p3rpc.femc.Components
         {
             _context._utils.SigScan(ACutinDraw_DrawPortraitBustupShadowColor_SIG, "ACutinDraw::DrawPortraitBustupShadowColor", _context._utils.GetDirectAddress, addr =>
             {
-                string[] function =
-                {
-                    "use64",
-                    $"{_context._hooks.Utilities.GetAbsoluteCallMnemonics(ACutinDraw_DrawPortraitBustupShadowColor, out _drawPortraitBustupWrapper)}",
-                };
+                var function = ColorInRegister(() => _context._config.CutinOuterHighlight);
                 _drawPortraitBustupShadowColor = _context._hooks.CreateAsmHook(function, addr, AsmHookBehaviour.ExecuteFirst).Activate();
             });
             _context._utils.SigScan(ACutinDraw_DrawOuterTriangleHiglhightColor_SIG, "ACutinDraw::DrawOuterTriangleHiglightColor", _context._utils.GetDirectAddress, addr =>
             {
-                string[] function =
-                {
-                    "use64",
-                    $"{_context._hooks.Utilities.GetAbsoluteCallMnemonics(ACutinDraw_DrawOuterTriangleHiglightColor, out _drawOuterTriangleWrapper)}",
-                };
+                var function = ColorInRegister(() => _context._config.BustupShadowColor);
                 _drawOuterTriangleHiglhightColor = _context._hooks.CreateAsmHook(function, addr, AsmHookBehaviour.ExecuteFirst).Activate();
             });
             _context._utils.SigScan(ACutinDraw_DrawEmotion_SIG, "ACutinDraw::DrawEmotion", _context._utils.GetDirectAddress, addr => _drawEmotion = _context._utils.MakeHooker<ACutinDraw_CutinDrawEmotion>(ACutinDraw_CutinDrawEmotionImpl, addr));
@@ -53,8 +45,6 @@ namespace p3rpc.femc.Components
         {
             _uiCommon = GetModule<UICommon>();
         }
-        public unsafe FSprColor ACutinDraw_DrawPortraitBustupShadowColor(FSprColor source) => ConfigColor.ToFSprColorWithAlpha(_context._config.CutinOuterHighlight, source.A);
-        public unsafe FSprColor ACutinDraw_DrawOuterTriangleHiglightColor(FSprColor source) => ConfigColor.ToFSprColorWithAlpha(_context._config.BustupShadowColor, source.A);
 
         public unsafe void ACutinDraw_CutinDrawEmotionImpl(ACutInDraw* self, nint masker, int emotion)
         {
@@ -67,9 +57,6 @@ namespace p3rpc.femc.Components
             }
             _drawEmotion.OriginalFunction(self, masker, emotion);
         }
-
-        [Function(FunctionAttribute.Register.rax, FunctionAttribute.Register.rax, false)]
-        public unsafe delegate FSprColor ACutinDraw_InjectColorAfterCtorCall(FSprColor source);
 
         public unsafe delegate void ACutinDraw_CutinDrawEmotion(ACutInDraw* self, nint masker, int emotion);
     }

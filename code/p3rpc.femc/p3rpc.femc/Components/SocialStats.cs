@@ -17,7 +17,7 @@ namespace p3rpc.femc.Components
         private string UCmpHeroHumanStatusDraw_GetStatUp_SIG = "0D 00 FF FF 00 89 44 24 ?? F3 44 0F 11 4C 24 ?? E8 ?? ?? ?? ?? 80 BF ?? ?? ?? ?? 00";
         private string UCmpHeroHumanStatusDraw_GetRankUp_SIG = "0D 00 FF FF 00 89 44 24 ?? F3 44 0F 11 4C 24 ?? E8 ?? ?? ?? ?? 83 7F ?? 02";
         private string UCmpHeroHumanStatusDraw_DrawSocialStatUpCircle_SIG = "4C 8B DC 53 56 41 57 48 81 EC B0 00 00 00";
-        private string UCmpHeroHumanStatusDraw_DrawStatUpRings_SIG = "44 88 64 24 ?? 0F 1F 84 ?? 00 00 00 00";
+        private string UCmpHeroHumanStatusDraw_DrawStatUpRings_SIG = "66 C7 44 24 ?? FF FF C6 44 24 ?? 00 44 88 64 24 ?? 0F 1F 84 ?? 00 00 00 00";
         private string UCmpHeroHumanStatusDraw_DrawStatUpMusicNote1_SIG = "E8 ?? ?? ?? ?? 41 B1 FF 89 45 ?? 45 0F B6 C1 89 45 ?? B2 F6";
         private string UCmpHeroHumanStatusDraw_DrawStatUpMusicNote2_SIG = "E8 ?? ?? ?? ?? 41 B1 FF 89 85 ?? ?? ?? ?? 45 0F B6 C1 89 85 ?? ?? ?? ?? 41 0F B6 D1 41 0F B6 C9 E8 ?? ?? ?? ?? 41 B1 FF B2 F6";
         private string UCmpHeroHumanStatusDraw_DrawStatUpMusicNoteBg_SIG = "E8 ?? ?? ?? ?? 89 87 ?? ?? ?? ?? 0F 57 C0";
@@ -26,9 +26,9 @@ namespace p3rpc.femc.Components
 
         private IHook<ACmpMainActor_GetParamRankUpTable> _getParamRankUpTable;
         private IHook<UCmpHeroHumanStatusDraw_DrawSocialStatUpCircle> _drawSocialStatUpCircle;
-        private IAsmHook _drawStatUpRings;
         private IAsmHook _drawStatUpMusicNote1;
         private IAsmHook _drawStatUpMusicNote2;
+        private IAsmHook _drawStatUpMusicNoteBg;
         private UICommon _uiCommon;
         public unsafe SocialStats(FemcContext context, Dictionary<string, ModuleBase<FemcContext>> modules) : base(context, modules)
         {
@@ -44,12 +44,12 @@ namespace p3rpc.femc.Components
             _context._utils.SigScan(UCmpHeroHumanStatusDraw_DrawSocialStatUpCircle_SIG, "UCmpHeroHumanStatusDraw::DrawSocialStatUpCircle", _context._utils.GetDirectAddress, addr => _drawSocialStatUpCircle = _context._utils.MakeHooker<UCmpHeroHumanStatusDraw_DrawSocialStatUpCircle>(UCmpHeroHumanStatusDraw_DrawSocialStatUpCircleImpl, addr));
             _context._utils.SigScan(UCmpHeroHumanStatusDraw_DrawStatUpRings_SIG, "UCmpHeroHumanStatusDraw::DrawStatUpRings", _context._utils.GetDirectAddress, addr =>
             {
-                string[] function =
-                {
-                    "use64",
-                    $"mov dword [rsp + 0x74], {_context._config.SocialStatsPulseCircleColorMain.ToU32ARGB()}",
-                };
-                _drawStatUpRings = _context._hooks.CreateAsmHook(function, addr, AsmHookBehaviour.ExecuteFirst).Activate();
+                // Leave the native alpha and stack layout intact.
+                _asmMemWrites.Add(new AddressToMemoryWrite(_context._memory, (nuint)addr + 5,
+                    address => _context._memory.Write(address, (ushort)
+                        (_context._config.SocialStatsPulseCircleColorMain.B | (_context._config.SocialStatsPulseCircleColorMain.G << 8)))));
+                _asmMemWrites.Add(new AddressToMemoryWrite(_context._memory, (nuint)addr + 11,
+                    address => _context._memory.Write(address, _context._config.SocialStatsPulseCircleColorMain.R)));
             });
             _context._utils.SigScan(UCmpHeroHumanStatusDraw_DrawStatUpMusicNote1_SIG, "UCmpHeroHumanStatusDraw::DrawStatUpMusicNote1", _context._utils.GetDirectAddress, addr =>
             {
@@ -84,7 +84,7 @@ namespace p3rpc.femc.Components
                     $"mov cl, ${_context._config.MusicNotesBgColor.R:X}",
                     "label yellow_background"
                 };
-                _drawStatUpMusicNote2 = _context._hooks.CreateAsmHook(function, addr, AsmHookBehaviour.ExecuteFirst).Activate();
+                _drawStatUpMusicNoteBg = _context._hooks.CreateAsmHook(function, addr, AsmHookBehaviour.ExecuteFirst).Activate();
             });
             _context._utils.SigScan(UCmpHeroHumanStatusDraw_DrawTriangleBG1_SIG, "UCmpHeroHumanStatusDraw::DrawTriangleBG1", _context._utils.GetDirectAddress, addr =>
             {

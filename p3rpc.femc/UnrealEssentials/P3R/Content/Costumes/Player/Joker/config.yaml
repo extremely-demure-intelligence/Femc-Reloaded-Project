@@ -1,10 +1,16 @@
 name: "Joker's Outfit"
 
 costume:
+  anim_path: None
   mesh_path: /Game/Costumes/Player/Joker/costume-mesh.uasset
 
 hair:
+  anim_path: None
   mesh_path: /Game/Costumes/Player/Joker/hair-mesh.uasset
   
 face:
+  anim_path: None
   mesh_path: /Game/Costumes/Player/Joker/face-mesh.uasset
+
+base:
+  mesh_path: /Game/Xrd777/Characters/Player/FemC/Femc_Skeleton

@@ -1,4 +1,16 @@
 name: "Tifa's Outfit"
 
 costume:
+  anim_path: None
   mesh_path: /Game/Costumes/Player/Tifa/costume-mesh.uasset
+
+base:
+  mesh_path: /Game/Xrd777/Characters/Player/FemC/Femc_Skeleton
+
+hair:
+  anim_path: None
+  mesh_path: /Game/Xrd777/Characters/Player/FemC/Femc_Hair
+
+face:
+  anim_path: None
+  mesh_path: /Game/Xrd777/Characters/Player/FemC/Femc_Face

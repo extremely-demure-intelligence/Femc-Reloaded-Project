@@ -761,8 +761,8 @@ namespace p3rpc.femc.Configuration
 
         [DisplayName("Deck Compatibility Switch")]
         [Category("Testing")]
-        [Description("Test option to disable some ui components that seem to be unstable on Linux. Please help us test this my windows 11 refugees.")]
-        [DefaultValue(false)]
+        [Description("Use original UI styling for the calendar, system menu, social stats, tutorials, missing persons, and requests. Disable to test the patched styling. Restart the game after changing this option.")]
+        [DefaultValue(true)]
         public bool DeckCompatibilitySwitch { get; set; } = true;
 
         // Custom Bustups (Right now just Ryoji)

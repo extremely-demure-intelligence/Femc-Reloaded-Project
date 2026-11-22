@@ -214,8 +214,8 @@ namespace p3rpc.femc
 				_modRuntime.AddModule<CampStats>();
 				_modRuntime.AddModule<CampSocialLink>();
 				_modRuntime.AddModule<CampQuest>();
-				// Disable loading of these modules when Deck Compatibility is enabled,
-				// as they are consistently problematic and prone to crashes on Linux
+				// Keep the original-styling fallback available while the patched
+				// modules are validated across game builds and Proton versions.
 				if (!deckCompatibilitySwitch)
 				{
 					_modRuntime.AddModule<CampCalendar>();
