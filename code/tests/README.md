@@ -1,5 +1,39 @@
 # Proton UI patch validation
 
+## Development package identity (2026-11-23)
+
+The Tartarus crash run (`2026-11-23 14.10.33 ~ P3R.txt`) loaded both
+`p3rpc.femc.dev` and `p3rpc.femc`. Black Leotard, the FeMC classroom cheat
+sheet, and Vengeance Ports required the canonical ID, implicitly loading the
+upstream package. Costume Framework also checks the explicit enabled-mod list
+for `p3rpc.femc` when selecting the default female player costumes; the separate
+development ID fails that check.
+
+Use `code/tools/install_dev.py` for development deployment. It keeps the name
+FemC-Dev but retains `p3rpc.femc` as the ID, moves previous implementations into
+`FemcDevBackups` outside the scanned Mods folder, migrates the selected development
+settings, disables upstream self-updates, and records the build hash. Close both
+the game and launcher before running it. Do not use the old separate-ID switcher.
+
+```sh
+python code/tools/test_install_dev.py
+python code/tools/install_dev.py --reloaded-root /path/to/ReloadedII --build-dir /path/to/build/p3rpc.femc
+```
+
+The 2026-11-23 dump reports an execute access violation at `P3R+0x566b460`
+on the game thread. It does not identify which mod caused the invalid transfer.
+Removing duplicate hooks and deploying the current branch fixes the demonstrated
+installation defects; a live Tartarus transition is still required to establish
+whether this also resolves the reported crash. The active installation was under
+`~/mods/P3R/ReloadedII`, not the separate `~/Reloaded II Mods/P3R/ReloadedII` copy.
+
+Validation: Release build succeeded (existing warnings); installer tests cover
+ID deduplication, settings preservation, backups, and repeat installation. The
+installed dependency graph resolves all 30 mods with one FemC implementation,
+and the installed DLL hash matches the build manifest. Gameplay retest pending.
+
+## Native UI patches
+
 This branch replaces mid-function managed color callbacks with native substitutions.
 The substitutions retain the original opacity, flags, scratch register, and stack;
 color data updates independently when configuration changes. Native initializer
