@@ -1,4 +1,4 @@
-﻿using p3rpc.commonmodutils;
+using p3rpc.commonmodutils;
 using p3rpc.nativetypes.Interfaces;
 using Reloaded.Hooks.Definitions;
 using Reloaded.Hooks.Definitions.Enums;
@@ -13,7 +13,7 @@ using System.Threading.Tasks;
 
 namespace p3rpc.femc.Components
 {
-    public class KeyHelp : NativeColorModule
+    public class KeyHelp : DirectColorModule
     {
         private UICommon _uiCommon;
 
@@ -21,7 +21,6 @@ namespace p3rpc.femc.Components
         private string FKeyHelpButtonAuto_DrawTextFillColorTransOut_SIG = "E8 ?? ?? ?? ?? 48 8B 4C 24 ?? 45 33 C0 33 D2 E8 ?? ?? ?? ?? B9 01 00 00 00";
         private string FKeyHelpButtonAuto_DrawTextTriangleColor_SIG = "48 8B 54 24 ?? 48 8D 4C 24 ?? 0F 57 DB 89 44 24 ??";
 
-        private string FKeyHelpButtonFastForward_UpdateState_SIG = "48 8D 05 ?? ?? ?? ?? 48 8D 8F ?? ?? ?? ?? 48 89 07 E8 ?? ?? ?? ?? 48 8D 05 ?? ?? ?? ?? 48 8D 8F ?? ?? ?? ??";
         // this signature sucks, usually sigs for in function asm hooks are way shorter
         private string FKeyHelpButtonFastForward_TriangleColor1_SIG = "41 0F 28 D9 89 45 ?? 41 0F 28 D1 48 8D 4C 24 ?? 48 8B D6 E8 ?? ?? ?? ?? F3 0F 10 87 ?? ?? ?? ?? 48 8D 8F ?? ?? ?? ?? F3 0F 10 8F ?? ?? ?? ?? F3 0F 11 44 24 ?? 0F 28 05 ?? ?? ?? ?? 0F 29 44 24 ?? F3 0F 11 4C 24 ?? C7 44 24 ?? 00 00 00 00 C7 45 ?? 00 00 00 00 E8 ?? ?? ?? ?? F3 0F 59 05 ?? ?? ?? ?? F3 0F 59 05 ?? ?? ?? ??";
         private string FKeyHelpButtonFastForward_TriangleColor2_SIG = "41 0F 28 D9 89 45 ?? 41 0F 28 D1 48 8D 4C 24 ?? 48 8B D6 E8 ?? ?? ?? ?? 33 D2";
@@ -33,20 +32,9 @@ namespace p3rpc.femc.Components
         private IAsmHook _autoDrawTextTriangleColor;
         private IAsmHook _autoDrawTextFillTransOutColor;
 
-        private IAsmHook _ffwdDrawTriangle1;
-        private IAsmHook _ffwdDrawTriangle2;
-        private IAsmHook _ffwdDrawTriangle3;
-
-        private IHook<UpdatePromptState> _ffwdUpdateState;
-        private IHook<UpdatePromptState> _movieUpdateState;
-        private readonly object _promptHookLock = new();
-        private bool _promptLayoutVerified;
-        private long _fastForwardAddress;
-        private long _movieAddress;
-
-        // The current base campaign uses the expanded layout too. Do not select
-        // the old native-types layout merely because bIsAigis is false.
-        private const string PromptColorLayout_SIG = "48 8D 7B 50 0F 1F 00 F3 0F 10 83 4C 02 00 00 45 0F B6 C7 F3 0F 59 C6 41 0F B6 D6 40 0F B6 CE F3 44 0F 2C C8 E8 ?? ?? ?? ?? 89 07 48 8D 7F 68 FF C5 3B AB 60 02 00 00 7C CE";
+        // Recolor the native non-white palette branch, before native code builds
+        // sprite/text colors. No managed callback touches a live prompt object.
+        private const string PromptPalette_SIG = "44 0F B6 B3 55 02 00 00 0F B6 F0 44 0F B6 BB 56 02 00 00";
 
         public unsafe KeyHelp(FemcContext context, Dictionary<string, ModuleBase<FemcContext>> modules) : base(context, modules)
         {
@@ -96,67 +84,49 @@ namespace p3rpc.femc.Components
                 _autoDrawTextFillTransOutColor = _context._hooks.CreateAsmHook(function, addr, AsmHookBehaviour.ExecuteFirst).Activate();
             });
 
-            _context._utils.SigScan(FKeyHelpButtonFastForward_TriangleColor1_SIG, "FKeyHelpButtonFastForward::DrawTriangleColor1", _context._utils.GetDirectAddress, addr =>
+            _context._utils.SigScan(FKeyHelpButtonFastForward_TriangleColor1_SIG, "FastForward::Triangle1", _context._utils.GetDirectAddress, addr =>
+                PatchColorInputs(addr, "FastForward::Triangle1", () => _context._config.ButtonPromptTriangleColor,
+                    (-36, "33C9", 0), (-38, "33D2", 1), (-41, "41B0DE", 2)));
+            _context._utils.SigScan(FKeyHelpButtonFastForward_TriangleColor2_SIG, "FastForward::Triangle2", _context._utils.GetDirectAddress, addr =>
+                PatchColorInputs(addr, "FastForward::Triangle2", () => _context._config.ButtonPromptTriangleColor,
+                    (-20, "33C9", 0), (-22, "33D2", 1), (-25, "41B0DE", 2)));
+            _context._utils.SigScan(FKeyHelpButtonFastForward_TriangleColor3_SIG, "FastForward::Triangle3", _context._utils.GetDirectAddress, addr =>
+                PatchColorInputs(addr, "FastForward::Triangle3", () => _context._config.ButtonPromptTriangleColor,
+                    (-33, "33C9", 0), (-35, "33D2", 1), (-38, "41B0DE", 2)));
+            _context._utils.SigScan(PromptPalette_SIG, "KeyHelp::NativeHighlightPalette", _context._utils.GetDirectAddress, PatchPromptPalette);
+            _context._utils.SigScan(FKeyHelpButtonMovie_UpdateState_SIG, "Movie::Colors", _context._utils.GetDirectAddress, addr =>
             {
-                var function = ColorInRegister(() => _context._config.ButtonPromptTriangleColor);
-                _ffwdDrawTriangle1 = _context._hooks.CreateAsmHook(function, addr, AsmHookBehaviour.ExecuteFirst).Activate();
-            });
-            _context._utils.SigScan(FKeyHelpButtonFastForward_TriangleColor2_SIG, "FKeyHelpButtonFastForward::DrawTriangleColor2", _context._utils.GetDirectAddress, addr =>
-            {
-                var function = ColorInRegister(() => _context._config.ButtonPromptTriangleColor);
-                _ffwdDrawTriangle2 = _context._hooks.CreateAsmHook(function, addr, AsmHookBehaviour.ExecuteFirst).Activate();
-            });
-            _context._utils.SigScan(FKeyHelpButtonFastForward_TriangleColor3_SIG, "FKeyHelpButtonFastForward::DrawTriangleColor3", _context._utils.GetDirectAddress, addr =>
-            {
-                var function = ColorInRegister(() => _context._config.ButtonPromptTriangleColor);
-                _ffwdDrawTriangle3 = _context._hooks.CreateAsmHook(function, addr, AsmHookBehaviour.ExecuteFirst).Activate();
-            });
-            _context._utils.SigScan(PromptColorLayout_SIG, "KeyHelp::VerifiedColorLayout", _context._utils.GetDirectAddress, addr =>
-            {
-                // Verify the text-color store as well as sprite start/count/stride.
-                if (!new ReadOnlySpan<byte>((void*)(addr + 0x75), 6).SequenceEqual(
-                    new byte[] { 0x89, 0x83, 0xF0, 0x01, 0x00, 0x00 }))
-                    return;
-                lock (_promptHookLock)
-                {
-                    _promptLayoutVerified = true;
-                    InstallPromptHooks();
-                }
-            });
-            _context._utils.SigScan(FKeyHelpButtonFastForward_UpdateState_SIG, "FKeyHelpButtonFastForward::UpdateState",
-                offset => *((nuint*)_context._utils.GetIndirectAddressLong(offset) + 1), address =>
-                {
-                    lock (_promptHookLock)
-                    {
-                        _fastForwardAddress = address;
-                        InstallPromptHooks();
-                    }
-                });
-            _context._utils.SigScan(FKeyHelpButtonMovie_UpdateState_SIG, "FKeyHelpButtonMovie::UpdateState", _context._utils.GetDirectAddress, address =>
-            {
-                lock (_promptHookLock)
-                {
-                    _movieAddress = address;
-                    InstallPromptHooks();
-                }
+                PatchColorInputs(addr, "Movie::MainColor", () => _context._config.ButtonPromptHighlightColor,
+                    (0x89D, "B11C", 0), (0x89B, "B24A", 1), (0x898, "41B0F9", 2));
+                PatchColorInputs(addr, "Movie::PulseColor", () => _context._config.ButtonPromptHighlightColor,
+                    (0xADA, "B11C", 0), (0xABD, "B24A", 1), (0xABA, "41B0F9", 2));
             });
         }
 
-        // Scans can finish in any order; install only after the native layout and
-        // each function-specific field access have both been verified.
-        private unsafe void InstallPromptHooks()
+        private unsafe void PatchPromptPalette(long address)
         {
-            if (!_promptLayoutVerified) return;
-            if (_fastForwardAddress != 0 && _ffwdUpdateState == null &&
-                new ReadOnlySpan<byte>((void*)(_fastForwardAddress + 0x123), 6).SequenceEqual(
-                    new byte[] { 0x8B, 0x8F, 0x90, 0x05, 0x00, 0x00 }))
-                _ffwdUpdateState = _context._utils.MakeHooker<UpdatePromptState>(FastForwardUpdateState, _fastForwardAddress);
-            if (_movieAddress != 0 && _movieUpdateState == null &&
-                new ReadOnlySpan<byte>((void*)(_movieAddress + 0x8CD), 6).SequenceEqual(
-                    new byte[] { 0x89, 0x86, 0x1C, 0x04, 0x00, 0x00 }) &&
-                new ReadOnlySpan<byte>((void*)(_movieAddress + 0xAE4), 6).SequenceEqual(
-                    new byte[] { 0x89, 0x86, 0xDC, 0x04, 0x00, 0x00 }))
-                _movieUpdateState = _context._utils.MakeHooker<UpdatePromptState>(MovieUpdateState, _movieAddress);
+            var expected = Convert.FromHexString("440FB6B3550200000FB6F0440FB6BB56020000");
+            if (!new ReadOnlySpan<byte>((void*)address, expected.Length).SequenceEqual(expected)) return;
+            // Only the low bytes are consumed by the native color constructors.
+            // Keep the preceding white/disabled-color branches and all alpha math.
+            PatchPaletteByte(address, 8, 0x41, 0xB6, () => _context._config.ButtonPromptHighlightColor.G); // r14b
+            PatchPaletteByte(address + 8, 3, 0x40, 0xB6, () => _context._config.ButtonPromptHighlightColor.R); // sil
+            PatchPaletteByte(address + 11, 8, 0x41, 0xB7, () => _context._config.ButtonPromptHighlightColor.B); // r15b
+        }
+
+        private void PatchPaletteByte(long address, int length, byte rex, byte opcode, Func<byte> value)
+        {
+            var replacement = Enumerable.Repeat((byte)0x90, length).ToArray();
+            replacement[0] = rex;
+            replacement[1] = opcode;
+            replacement[2] = value();
+            _ = new AddressToMemoryWrite(_context._memory, (nuint)address, destination =>
+            {
+                for (int i = 0; i < replacement.Length; i++)
+                    _context._memory.Write(destination + (nuint)i, replacement[i]);
+            });
+            _asmMemWrites.Add(new AddressToMemoryWrite(_context._memory, (nuint)(address + 2),
+                destination => _context._memory.Write(destination, value())));
         }
 
         public override void Register()
@@ -164,18 +134,5 @@ namespace p3rpc.femc.Components
             _uiCommon = GetModule<UICommon>();
         }
 
-        private void FastForwardUpdateState(nint self, float deltaTime, nint position, float opacity)
-        {
-            _ffwdUpdateState.OriginalFunction(self, deltaTime, position, opacity);
-            KeyHelpColors.ApplyFastForward(self, _context._config.ButtonPromptHighlightColor.ToU32IgnoreAlpha());
-        }
-
-        private void MovieUpdateState(nint self, float deltaTime, nint position, float opacity)
-        {
-            _movieUpdateState.OriginalFunction(self, deltaTime, position, opacity);
-            KeyHelpColors.ApplyMovie(self, _context._config.ButtonPromptHighlightColor.ToU32IgnoreAlpha());
-        }
-
-        private delegate void UpdatePromptState(nint self, float deltaTime, nint position, float opacity);
     }
 }

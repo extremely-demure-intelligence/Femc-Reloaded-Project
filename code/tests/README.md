@@ -161,20 +161,22 @@ wrapper read flags at `0x258` as the sprite count (actually `0x260`), read state
 at `0x588` instead of `0x590`, and wrote colors eight bytes before their fields.
 This allowed the sprite recoloring loop to write beyond the four inline slots.
 
-Prompt hooks now require native layout verification, use the verified offsets,
-reject invalid sprite counts, and retain native fade alpha. Scan completion
-order does not affect installation. Unsupported layouts leave the corresponding
-managed recoloring hooks uninstalled. The movie prompt uses the corrected layout
-too. Existing auto/triangle hooks are retained.
+The 2026-11-24 crane-game fast-forward crash recurred at the same native call
+on the corrected-layout build. Its exact corrupting write remains unproven.
+The fast-forward/movie managed update callbacks have now been removed. Native
+palette instructions supply configured RGB values before the game constructs
+its sprite/text colors, preserving native white/disabled states and fade alpha.
+Movie accent colors and fast-forward triangles use verified color-argument
+patches. No fast-forward update detour or prompt-object recoloring loop remains.
 
 ```sh
-dotnet run --project code/tests/KeyHelpColors/KeyHelpColors.csproj -c Release
 python code/tools/test_keyhelp_layout.py /path/to/P3R.exe
 ```
 
-The memory test covers 20,480 combinations of state, count, and fade alpha,
-including poisoned legacy fields, invalid counts, and surrounding guard bytes.
-The binary test verifies unique signatures, runtime guards, field offsets, and
-inline sprite capacity against the installed executable. Gameplay validation of
-arcade fast-forward and movie prompts remains necessary; these checks do not
-reproduce the live game crash.
+This test verifies unique signatures and complete color-input instructions
+against the game binary. It also executes the game's patched palette branch
+for 32 combinations of custom RGB, native highlight/white, and disabled/fading
+flags, checking that object memory is unchanged. The earlier synthetic layout
+memory test has been retired with the managed helper. Build and binary tests
+cannot confirm resolution of the live crane-game crash; gameplay validation
+remains necessary.
