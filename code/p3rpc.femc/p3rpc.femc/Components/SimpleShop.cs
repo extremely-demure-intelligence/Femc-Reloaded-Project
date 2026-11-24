@@ -9,7 +9,7 @@ using System.Threading.Tasks;
 
 namespace p3rpc.femc.Components
 {
-    public class SimpleShop : ModuleBase<FemcContext>
+    public class SimpleShop : ModuleAsmInlineColorEdit<FemcContext>
     {
         private string ASimpleShopDraw_DrawShopDetails_InfoColor_SIG = "48 8B B3 ?? ?? ?? ?? 8B 84 24 ?? ?? ?? ??";
 
@@ -19,8 +19,8 @@ namespace p3rpc.femc.Components
         private string ASimpleShopDraw_DrawBuyItemCount_ZeroNumberColor_SIG = "44 88 64 24 ?? 48 85 C9 75";
 
         private string ASimpleShopDraw_DrawBuyMenu_ShadowColor_SIG = "E8 ?? ?? ?? ?? 0F B6 83 ?? ?? ?? ?? 41 B1 05 88 44 24 ?? 41 B0 04 C6 44 24 ?? 0F 33 D2 C6 44 24 ?? 01 48 8B CE";
-        private string ASimpleShopDraw_DrawBuyMenu_BuyFontColor_SIG = "8B 44 24 ?? 0F 57 DB F3 0F 10 0D ?? ?? ?? ??";
-        private string ASimpleShopDraw_DrawBuyMenu_QuitFontColor_SIG = "8B 44 24 ?? 0F 57 DB F3 0F 10 15 ?? ?? ?? ??";
+        private string ASimpleShopDraw_DrawBuyMenu_BuyFontColor_SIG = "66 C7 44 24 60 5B 0E 44 88 64 24 62 EB 0C 66 C7 44 24 60 FF FF C6 44 24 62 FF 8B 44 24 60 0F 57 DB F3 0F 10 0D ?? ?? ?? ??";
+        private string ASimpleShopDraw_DrawBuyMenu_QuitFontColor_SIG = "66 C7 44 24 60 5B 0E C6 44 24 62 00 EB 0C 66 C7 44 24 60 FF FF C6 44 24 62 FF 8B 44 24 60 0F 57 DB F3 0F 10 15 ?? ?? ?? ??";
 
         private IAsmHook _shopInfoColor;
         private IAsmHook _drawHighlightedColor;
@@ -28,8 +28,6 @@ namespace p3rpc.femc.Components
         private IAsmHook _drawBuyItemCountBackgroundFilter2;
         private IAsmHook _drawBuyItemCountZeroNumberColor;
         private IAsmHook _drawBuyMenuShadowColor;
-        private IAsmHook _drawBuyMenuBuyFontColor;
-        private IAsmHook _drawBuyMenuQuitFontColor;
 
         public unsafe SimpleShop(FemcContext context, Dictionary<string, ModuleBase<FemcContext>> modules) : base(context, modules)
         {
@@ -103,31 +101,28 @@ namespace p3rpc.femc.Components
                 };
                 _drawBuyMenuShadowColor = _context._hooks.CreateAsmHook(function, addr, AsmHookBehaviour.ExecuteFirst).Activate();
             });
-            _context._utils.SigScan(ASimpleShopDraw_DrawBuyMenu_BuyFontColor_SIG, "ASimpleShopDraw::DrawBuyMenuBuyFontColor", _context._utils.GetDirectAddress, addr =>
+            PatchSelectedFontColor(ASimpleShopDraw_DrawBuyMenu_BuyFontColor_SIG, "ASimpleShopDraw::DrawBuyMenuBuyFontColor");
+            PatchSelectedFontColor(ASimpleShopDraw_DrawBuyMenu_QuitFontColor_SIG, "ASimpleShopDraw::DrawBuyMenuQuitFontColor");
+        }
+
+        private void PatchSelectedFontColor(string signature, string name)
+        {
+            _context._utils.SigScan(signature, name, _context._utils.GetDirectAddress, addr =>
             {
-                string[] function =
-                {
-                    "use64",
-                    "jnz .original",
-                    $"mov byte [rsp+0x62], ${_context._config.SimpleShopBuyFontColor.R:X}",
-                    $"mov byte [rsp+0x61], ${_context._config.SimpleShopBuyFontColor.G:X}",
-                    $"mov byte [rsp+0x60], ${_context._config.SimpleShopBuyFontColor.B:X}",
-                    ".original:"
-                };
-                _drawBuyMenuBuyFontColor = _context._hooks.CreateAsmHook(function, addr, AsmHookBehaviour.ExecuteFirst).Activate();
-            });
-            _context._utils.SigScan(ASimpleShopDraw_DrawBuyMenu_QuitFontColor_SIG, "ASimpleShopDraw::DrawBuyMenuQuitFontColor", _context._utils.GetDirectAddress, addr =>
-            {
-                string[] function =
-                {
-                    "use64",
-                    "jnz .original",
-                    $"mov byte [rsp+0x62], ${_context._config.SimpleShopBuyFontColor.R:X}",
-                    $"mov byte [rsp+0x61], ${_context._config.SimpleShopBuyFontColor.G:X}",
-                    $"mov byte [rsp+0x60], ${_context._config.SimpleShopBuyFontColor.B:X}",
-                    ".original:"
-                };
-                _drawBuyMenuQuitFontColor = _context._hooks.CreateAsmHook(function, addr, AsmHookBehaviour.ExecuteFirst).Activate();
+                // Edit only the selected branch's RGB initialization. Keep the native
+                // selection test, unselected white, fade alpha and RIP-relative loads.
+                // The old Buy detour crashed at P3R+0x13f1d9e under Proton.
+                _asmMemWrites.Add(new AddressToMemoryWrite(_context._memory, (nuint)addr + 5,
+                    address => _context._memory.Write(address, (ushort)
+                        (_context._config.SimpleShopBuyFontColor.B | (_context._config.SimpleShopBuyFontColor.G << 8)))));
+                _asmMemWrites.Add(new AddressToMemoryWrite(_context._memory, (nuint)addr + 7,
+                    address =>
+                    {
+                        // mov byte [rsp+0x62], imm8 replaces the equally sized
+                        // r12b store (Buy) or updates the existing immediate (Quit).
+                        _context._memory.Write(address, 0x622444c6u);
+                        _context._memory.Write(address + 4, _context._config.SimpleShopBuyFontColor.R);
+                    }));
             });
         }
         public override void Register()

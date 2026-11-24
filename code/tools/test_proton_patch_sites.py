@@ -93,3 +93,37 @@ assert 'CreateAsmHook' not in number_block
 print('PASS: request number-column RGB edits preserve the native call and fade alpha')
 
 # Map sites are validated and executed by test_map_color_patches.py.
+
+# Shop purchase crash (2026-11-24): RIP was +0x13f1d9e, inside the old
+# Buy font detour's overwritten span. Keep the entire draw setup in place.
+for name, red_store in [
+    ('ASimpleShopDraw_DrawBuyMenu_BuyFontColor_SIG', '44 88 64 24 62'),
+    ('ASimpleShopDraw_DrawBuyMenu_QuitFontColor_SIG', 'C6 44 24 62 00'),
+]:
+    rva, original = unique('SimpleShop.cs', name)
+    assert original[:7] == bytes.fromhex('66 C7 44 24 60 5B 0E')
+    assert original[7:12] == bytes.fromhex(red_store)
+    assert original[12:14] == bytes.fromhex('EB 0C')
+    assert original[14:26] == bytes.fromhex('66 C7 44 24 60 FF FF C6 44 24 62 FF')
+    assert original[26:33] == bytes.fromhex('8B 44 24 60 0F 57 DB')
+    for red, green, blue in [(0x5c, 0, 6), (0x12, 0x34, 0x56), (255, 255, 255), (0, 0, 0)]:
+        patched = bytearray(original)
+        patched[5:7] = bytes([blue, green])
+        patched[7:12] = bytes([0xc6, 0x44, 0x24, 0x62, red])
+        instructions = list(decoder.disasm(patched, rva))
+        assert instructions[0].mnemonic == instructions[1].mnemonic == 'mov'
+        assert instructions[0].operands[1].imm == blue | green << 8
+        assert instructions[1].operands[1].imm == red
+        assert instructions[1].address == rva + 7 and instructions[1].size == 5
+        assert patched[12:] == original[12:]  # branches, white and draw/load bytes
+        assert instructions[2].mnemonic == 'jmp' and instructions[2].operands[0].imm == rva + 26
+    # Native fade-alpha store and selection branch precede both initializers.
+    prefix = pe.get_data(rva - (11 if 'BuyFont' in name else 12), 12)
+    assert prefix[:5] == bytes.fromhex('40 88 7C 24 63')
+    assert pe.get_data(rva - 2, 2) == bytes.fromhex('75 0E')
+    print('PASS:', name, 'selected RGB retains native selection, alpha, and draw setup')
+source = (root / 'SimpleShop.cs').read_text(encoding='utf-8-sig')
+font_patch = source.split('private void PatchSelectedFontColor', 1)[1]
+assert 'CreateAsmHook' not in font_patch
+assert '0x622444c6u' in font_patch and 'address + 4' in font_patch
+assert 'class SimpleShop : ModuleAsmInlineColorEdit<FemcContext>' in source

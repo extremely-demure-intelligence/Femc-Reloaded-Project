@@ -32,6 +32,26 @@ ID deduplication, settings preservation, backups, and repeat installation. The
 installed dependency graph resolves all 30 mods with one FemC implementation,
 and the installed DLL hash matches the build manifest. Gameplay retest pending.
 
+## Shop purchase crash follow-up (2026-11-24)
+
+The 06:50 UTC crash reports a write access violation at `P3R+0x13f1d9e`,
+seven bytes into the old Buy font-color hook site (`+0x13f1d97`). RAX contains
+`0x005c0006`, the configured selected font RGB. The original executable has a
+RIP-relative `movss` read at the fault address; the dump does not capture the
+patched code page, so the exact failing trampoline bytes cannot be established.
+
+The Buy and Quit font hooks now edit the native selected-color initializers.
+The Buy red-channel register store becomes an equal-length immediate store;
+the original selection branches, unselected white, fade-alpha store and draw
+setup remain intact. The standard inline-color module supports config updates.
+
+Validation: both signatures match uniquely in the installed Steam executable;
+`test_proton_patch_sites.py` verifies instruction boundaries, RGB substitutions,
+and preservation of selection/alpha/draw bytes. Release build succeeds with
+existing warnings. Installer regression tests pass. Gameplay retest is pending:
+reopen the same shop, switch Buy/Quit, choose an item and quantity, confirm a
+purchase, then back out and reopen the shop. Episode Aigis remains untested.
+
 ## Native UI patches
 
 This branch replaces mid-function managed color callbacks with native substitutions.
